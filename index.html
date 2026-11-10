@@ -581,8 +581,8 @@ const uberUrl=d=>`https://m.uber.com/ul/?action=setPickup&pickup=my_location&dro
 const mapsUrl=d=>`https://www.google.com/maps/dir/?api=1&destination=${d.lat},${d.lng}&travelmode=driving`;
 
 const PT_ASK = "Você pode voltar para nos buscar às ___? Podemos combinar pelo WhatsApp?";
-const WARN_GO = d => `<b>⚠️ Return rides may be hard to get.</b> ${d.name} is on the outskirts, and Uber pickups there aren't guaranteed, especially on weekdays. Before you leave the car:<br>• Ask your driver to come back at a set time and swap WhatsApp numbers:<br><span class="pt">"${PT_ASK}"</span> (Can you come back to pick us up at ___? Can we arrange it on WhatsApp?)<br>• Or schedule the return with Uber Reserve, if the app offers it (needs about 2 hours' notice).<br>• Backup: the 99 app, or call Le Renard's front desk, (12) 3669-2220, to send a taxi.`;
-const WARN_HERE = `<b>⚠️ You're at a spot where pickups can be slow.</b> Request your ride about 15 minutes before you want to leave, and check you have signal. If no car accepts, try the 99 app or call Le Renard, (12) 3669-2220, for a taxi.`;
+const WARN_GO = d => `<b>⚠️ Return rides may be hard to get.</b> ${d.name} is on the outskirts, and Uber pickups there aren't guaranteed, especially on weekdays. Before you leave the car:<br>• Ask your driver to come back at a set time and swap WhatsApp numbers:<br><span class="pt">"${PT_ASK}"</span> (Can you come back to pick us up at ___? Can we arrange it on WhatsApp?)<br>• Or schedule the return with Uber Reserve, if the app offers it (needs about 2 hours' notice).<br>• Backup: the 99 app, or call Le Renard's front desk, <a href="tel:+551236692220">(12) 3669-2220</a>, to send a taxi. A phone call needs only regular cell signal, not data.`;
+const WARN_HERE = `<b>⚠️ You're at a spot where pickups can be slow.</b> Request your ride about 15 minutes before you want to leave, and check you have signal. If no car accepts, try the 99 app or call Le Renard, <a href="tel:+551236692220">(12) 3669-2220</a>, for a taxi. A phone call needs only regular cell signal, not data.`;
 function rideWarning(k){
   const d=DEST[k];
   if(d.remote) return WARN_GO(d);
