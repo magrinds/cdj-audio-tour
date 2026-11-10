@@ -609,15 +609,17 @@ async function beginTracking(){ await keepAwake(); if(watching) return; watching
   else onGeoErr({message:'not supported'}); }
 $('start').onclick = async ()=>{
   unlockAudio();
-  if(!started){
-    started=true;
-    $('start').textContent='Tour running'; $('start').classList.add('secondary');
+  if(started){ // tour already running (or restored after refresh): never auto-replay the intro
     await beginTracking();
-    const sw = navigator.serviceWorker && navigator.serviceWorker.controller;
-    $('status').innerHTML = `${sw?'<span class="ok">Saved for offline use.</span>':'Offline copy is being saved; reload once while online to be sure.'} Screen will stay on while this page is open.`;
+    if(current && paused) togglePause();
+    $('status').innerHTML='<span class="ok">Tour running.</span> To hear the intro again, tap ▶ on stop 1.';
+    return;
   }
-  if(!$('start').dataset.orig) $('start').dataset.orig=$('start').innerHTML;
-  if(current && current.stop.id!=='drive1'){ confirmTap('start','Replay intro? Tap again', ()=>{ playNow('drive1'); saveState(); }, ()=>armBtn($('start'),'start','Replay intro? Tap again',$('start').dataset.orig||'Tour running')); return; }
+  started=true;
+  $('start').textContent='Tour running'; $('start').classList.add('secondary');
+  await beginTracking();
+  const sw = navigator.serviceWorker && navigator.serviceWorker.controller;
+  $('status').innerHTML = `${sw?'<span class="ok">Saved for offline use.</span>':'Offline copy is being saved; reload once while online to be sure.'} Screen will stay on while this page is open.`;
   playNow('drive1'); saveState();
 };
 
@@ -811,7 +813,7 @@ showScene('drive1'); renderStops(); drawMap();
 // ---------- restore after refresh ----------
 (function(){
   const st=store.get('cdj_state',null); if(!st || !st.started || Date.now()-(st.t||0)>12*3600*1000) return;
-  started=true; $('start').textContent='Tour running · tap to replay intro'; $('start').classList.add('secondary');
+  started=true; $('start').textContent='Tour running'; $('start').classList.add('secondary');
   queue=(st.queue||[]).filter(id=>STOPS.find(s=>s.id===id)||FILLERS.find(s=>s.id===id));
   beginTracking();
   if(st.cur){ const stop=STOPS.find(s=>s.id===st.cur.id)||FILLERS.find(s=>s.id===st.cur.id);
