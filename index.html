@@ -100,6 +100,14 @@
     <div class="status" id="status">Tap Start to enable GPS, audio, and keep-screen-on. Then you can switch on airplane mode to test offline.</div>
   </div>
 
+  <div class="card" id="rideCard">
+    <div style="font-size:13px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.04em">🚕 Next ride</div>
+    <div id="rideTo" style="font-size:18px;font-weight:700;margin:4px 0 2px"></div>
+    <div class="status" id="rideNote" style="margin-top:0"></div>
+    <div id="rideWarn" class="warnbox" style="display:none"></div>
+    <div class="row" style="margin-top:10px"><a id="rideUber" class="btnlink">Open in Uber</a><a id="rideMaps" class="btnlink sec">Google Maps</a></div>
+    <details style="margin-top:12px"><summary style="font-size:14px">Other destinations</summary><div id="rideList"></div></details>
+  </div>
   <div class="stage" id="stage"></div>
   <div class="quiz" id="quiz"><div class="qh">🎯 QUIZ TIME</div><div class="qt" id="qt"></div><div class="qc" id="qc"></div><div class="qa" id="qa"></div></div>
   <div class="card" id="now">
@@ -112,14 +120,6 @@
     </div>
   </div>
 
-  <div class="card" id="rideCard">
-    <div style="font-size:13px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.04em">🚕 Next ride</div>
-    <div id="rideTo" style="font-size:18px;font-weight:700;margin:4px 0 2px"></div>
-    <div class="status" id="rideNote" style="margin-top:0"></div>
-    <div id="rideWarn" class="warnbox" style="display:none"></div>
-    <div class="row" style="margin-top:10px"><a id="rideUber" class="btnlink">Open in Uber</a><a id="rideMaps" class="btnlink sec">Google Maps</a></div>
-    <details style="margin-top:12px"><summary style="font-size:14px">Other destinations</summary><div id="rideList"></div></details>
-  </div>
   <div class="card">
     <svg id="map" viewBox="0 0 400 260"></svg>
     <div class="status" id="gpsInfo">GPS: off</div>
