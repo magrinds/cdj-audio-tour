@@ -87,6 +87,13 @@
   .dest { display:flex; align-items:center; padding:8px 0; border-top:1px solid var(--line); } .dest .n { flex:1; font-size:14px; font-weight:600; } .dest .m { font-size:12px; color:var(--mute); font-weight:400; }
   .warnbox { background:#fff7e6; border:1px solid #fcd38a; border-radius:14px; padding:10px 12px; margin-top:10px; font-size:14px; line-height:1.45; }
   .warnbox b { color:#b45309; } .warnbox .pt { font-style:italic; color:var(--deep); }
+  .ridebox { margin:0 0 14px; }
+  .ridebox > summary { list-style:none; display:inline-flex; align-items:center; gap:6px; max-width:100%; background:#fff; border:1px solid var(--line); border-radius:999px; padding:9px 14px; font-size:14px; box-shadow:0 4px 14px rgba(29,78,216,.10); cursor:pointer; white-space:nowrap; overflow:hidden; }
+  .ridebox > summary::-webkit-details-marker { display:none; }
+  .ridebox > summary b { overflow:hidden; text-overflow:ellipsis; color:var(--deep); }
+  .ridebox .rlabel { color:var(--accent); font-weight:700; }
+  .ridebox .chev { color:var(--mute); transition:transform .2s; } .ridebox[open] .chev { transform:rotate(180deg); }
+  .ridebox .ridebody { background:#fff; border:1px solid var(--line); border-radius:18px; padding:14px; margin-top:8px; box-shadow:0 6px 20px rgba(29,78,216,.08); }
 </style>
 </head>
 <body>
@@ -100,14 +107,15 @@
     <div class="status" id="status">Tap Start to enable GPS, audio, and keep-screen-on. Then you can switch on airplane mode to test offline.</div>
   </div>
 
-  <div class="card" id="rideCard">
-    <div style="font-size:13px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.04em">🚕 Next ride</div>
-    <div id="rideTo" style="font-size:18px;font-weight:700;margin:4px 0 2px"></div>
-    <div class="status" id="rideNote" style="margin-top:0"></div>
-    <div id="rideWarn" class="warnbox" style="display:none"></div>
-    <div class="row" style="margin-top:10px"><a id="rideUber" class="btnlink">Open in Uber</a><a id="rideMaps" class="btnlink sec">Google Maps</a></div>
-    <details style="margin-top:12px"><summary style="font-size:14px">Other destinations</summary><div id="rideList"></div></details>
-  </div>
+  <details class="ridebox" id="rideCard">
+    <summary><span>🚕</span><span class="rlabel">Next ride:</span> <b id="rideTo"></b><span id="rideFlag"></span><span class="chev">▾</span></summary>
+    <div class="ridebody">
+      <div class="status" id="rideNote" style="margin-top:0"></div>
+      <div id="rideWarn" class="warnbox" style="display:none"></div>
+      <div class="row" style="margin-top:10px"><a id="rideUber" class="btnlink">Open in Uber</a><a id="rideMaps" class="btnlink sec">Google Maps</a></div>
+      <details style="margin-top:12px"><summary style="font-size:14px">Other destinations</summary><div id="rideList"></div></details>
+    </div>
+  </details>
   <div class="stage" id="stage"></div>
   <div class="quiz" id="quiz"><div class="qh">🎯 QUIZ TIME</div><div class="qt" id="qt"></div><div class="qc" id="qc"></div><div class="qa" id="qa"></div></div>
   <div class="card" id="now">
@@ -602,7 +610,7 @@ function renderRide(){
   const away = lastFix ? ' · '+fmt(dist(lastFix.lat,lastFix.lng,d.lat,d.lng))+' away' : '';
   $('rideNote').textContent = d.note + away;
   $('rideUber').href=uberUrl(d); $('rideMaps').href=mapsUrl(d);
-  const w=rideWarning(k); $('rideWarn').style.display=w?'block':'none'; $('rideWarn').innerHTML=w;
+  const w=rideWarning(k); $('rideWarn').style.display=w?'block':'none'; $('rideWarn').innerHTML=w; $('rideFlag').textContent=w?' ⚠️':'';
   $('rideList').innerHTML = Object.entries(DEST).filter(([kk])=>kk!==k).map(([kk,v])=>`<div class="dest"><div class="n">${v.name}<div class="m">${v.note}</div></div>${v.remote?'<span title="Return rides may be hard" style="margin-right:4px">⚠️</span>':''}<a class="mini" href="${uberUrl(v)}">Uber</a><a class="mini sec" href="${mapsUrl(v)}">Maps</a></div>`).join('');
 }
 
