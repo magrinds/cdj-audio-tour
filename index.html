@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="theme-color" content="#0b2a5b">
 <link rel="manifest" href="manifest.json">
-<title>Right Here, Right Now · Campos do Jordão</title>
+<title>Right Here, Right Now</title>
 <style>
   :root { --bg:#eef4fb; --ink:#0f1f33; --mute:#5b6b80; --accent:#1d4ed8; --accent2:#f59e0b; --card:#fff; --line:#dbe5f2; --deep:#0b2a5b; }
   * { box-sizing:border-box; }
@@ -112,15 +112,25 @@
   details.sec > summary::after { content:'▾'; color:var(--mute); margin-left:8px; transition:transform .2s; } details.sec[open] > summary::after { transform:rotate(180deg); }
   details.sec .cnt { margin-left:auto; font-size:12px; font-weight:600; color:var(--mute); }
   .upnext { background:#eef4ff; border:1px solid #c7d8fb; border-radius:14px; padding:6px 10px; margin-bottom:8px; } .upnext .lbl { font-size:11px; font-weight:800; letter-spacing:.06em; color:var(--accent); text-transform:uppercase; } .upnext .stop { border-top:0; }
+  .chips button.on { background:var(--accent); color:#fff; }
+  .tourbar { display:flex; align-items:center; gap:10px; }
+  .tourbar .t { flex:1; min-width:0; } .tourbar .t b { font-size:17px; color:var(--deep); } .tourbar .t div { font-size:12px; color:var(--mute); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .pill { display:inline-block; font-size:11px; font-weight:700; background:#fff7e6; color:#b45309; border:1px solid #fcd38a; border-radius:999px; padding:1px 8px; margin-left:6px; vertical-align:middle; }
+  .chips button.planchip { background:#fff7e6; color:#b45309; border:1px solid #fcd38a; }
+  .sheet textarea, .sheet .inp { width:100%; font:inherit; padding:12px; border:1px solid var(--line); border-radius:12px; margin:6px 0 10px; }
   .hidep { display:flex; align-items:center; gap:6px; font-size:13px; color:var(--mute); margin:4px 0; } .hidep input { width:18px; height:18px; }
 </style>
 </head>
 <body>
 <header>
   <div class="brand"><svg class="mark" viewBox="56 30 128 170" aria-hidden="true"><g fill="none" stroke="#bfdbfe" stroke-linecap="round"><ellipse cx="120" cy="186" rx="60" ry="13" stroke-width="5" opacity=".5"/><ellipse cx="120" cy="186" rx="32" ry="7" stroke-width="6" opacity=".9"/></g><path d="M120 186 C 92 146, 64 120, 64 88 A 56 56 0 0 1 176 88 C 176 120, 148 146, 120 186 Z" fill="#fff"/><circle cx="120" cy="88" r="24" fill="#1d4ed8"/><path d="M112 76 L132 88 L112 100 Z" fill="#fff"/><path d="M141 74 q10 14 0 28" fill="none" stroke="#f59e0b" stroke-width="5" stroke-linecap="round"/></svg><div><h1>Right Here, Right Now<span style="color:#f59e0b">.</span></h1><div class="tag">STORIES WHERE YOU STAND</div></div></div>
-  <div class="sub">Campos do Jordão audio tour · works offline once loaded</div>
+  <div class="sub" id="sub">Loading tour…</div>
 </header>
 <main>
+  <div class="card tourbar">
+    <div class="t"><b id="tourName">…</b><span class="pill" id="planBadge" style="display:none">plan changed</span><div id="tourBlurb"></div></div>
+    <button class="secondary" id="tourBtn">Tours</button>
+  </div>
   <div class="card">
     <button id="start">▶ Start tour</button>
     <div class="status" id="status">Tap Start to enable GPS, audio, and keep-screen-on. Then you can switch on airplane mode to test offline.</div>
@@ -145,7 +155,7 @@
       </div>
       <label style="display:block;margin-top:10px">Destination</label><select id="walkSel"></select>
       <div class="row" style="margin-top:10px"><button id="compassBtn" class="secondary" style="flex:1">Use compass</button><a id="walkMaps" class="btnlink sec">Walking directions</a></div>
-      <div class="status">Inside the museum, follow the phase signs; GPS can't tell the forest paths apart.</div>
+      <div class="status" id="walkFoot"></div>
     </div>
   </details>
   <div class="stage" id="stage"></div>
@@ -169,13 +179,13 @@
   <div class="card">
     <div class="row maptabs"><button id="tabG" class="secondary on">Google map</button><button id="tabL" class="secondary">Live position (offline)</button></div>
     <div id="gwrap"><iframe id="gmap" title="Tour route on Google Maps" loading="lazy" referrerpolicy="no-referrer-when-downgrade" allowfullscreen></iframe>
-      <div class="status" id="gNote">Route: hotel, museum, monastery, back to hotel. <a id="gOpen" target="_blank" rel="noopener">Open in Google Maps ↗</a></div></div>
+      <div class="status" id="gNote"><span id="gNoteTxt"></span> <a id="gOpen" target="_blank" rel="noopener">Open in Google Maps ↗</a></div></div>
     <svg id="map" viewBox="0 0 400 260" style="display:none"></svg>
     <div class="status" id="gpsInfo">GPS: off</div>
   </div>
 
   <div class="card">
-    <div class="status" style="margin:0 0 6px">Tip: long-press any stop to reset it. In the museum, tap ▶ at each phase sign.</div>
+    <div class="status" style="margin:0 0 6px" id="stopsTip">Tip: long-press any stop to reset it.</div>
     <div id="stops"></div>
   </div>
 
@@ -248,858 +258,59 @@
   <div class="status" id="albumStatus">Loading…</div>
   <div class="grid" id="grid"></div>
 </div></div>
+<div class="sheet" id="pickSheet"><div class="panel">
+  <div class="row" style="justify-content:space-between"><h2 style="margin:0">🗺 Tours</h2><button class="secondary" data-close="pickSheet">Close</button></div>
+  <div class="row" style="margin:10px 0"><button id="newTour" style="flex:1">✨ Create a new tour</button></div>
+  <div class="row" style="margin-bottom:6px"><button class="secondary" id="shareTour" style="flex:1">🔗 Share this tour</button><button class="secondary" id="resetPlan" style="flex:1">↺ Original plan</button></div>
+  <div class="status" id="pickStatus"></div>
+  <div id="pickList"></div>
+</div></div>
+<div class="sheet" id="createSheet"><div class="panel">
+  <div class="row" style="justify-content:space-between"><h2 style="margin:0">✨ Create a tour</h2><button class="secondary" data-close="createSheet">Close</button></div>
+  <label>Where?</label><input class="inp" id="cWhere" placeholder="e.g. Jardins, São Paulo or Old Town Sacramento">
+  <label>Starting point (hotel or address, optional)</label><input class="inp" id="cStart" placeholder="e.g. Hotel Unique, Av. Brigadeiro Luís Antônio">
+  <label>How long?</label><div class="chips" id="c_len"></div>
+  <label>Getting around</label><div class="chips" id="c_mode"></div>
+  <label>Pace</label><div class="chips" id="c_pace"></div>
+  <label>Interests</label><div class="chips" id="c_likes"></div>
+  <label>Who's coming? (kids, diet, mobility)</label><input class="inp" id="cGroup" placeholder="e.g. 2 adults, one prefers low saturated fat food">
+  <label>Anything else?</label><textarea id="cMore" rows="2" placeholder="e.g. end at a good café, avoid steep hills"></textarea>
+  <div class="row"><button class="secondary" id="cMic">🎤 Speak</button><button id="cGo" style="flex:1">Create tour</button></div>
+  <div class="status" id="cStatus">Claude writes the stops, the narration and the GPS points. Needs signal; afterwards the tour works offline.</div>
+</div></div>
 <div class="toast" id="toast"></div>
 <div class="viewer" id="viewer"><img id="viewImg" alt="" crossorigin="anonymous">
   <div class="vbar"><button id="vShare">Share</button><button id="vSave" class="secondary">Save</button><button id="vDel" class="warn" style="display:none">🗑 Delete</button><button id="vClose" class="secondary">Close</button></div>
   <div class="vmsg" id="vMsg"></div></div>
+<script src="tours/campos-do-jordao.js"></script>
 <script>
-const STOPS = [
- { id:"drive1", name:"Drive up to Alto da Boa Vista (museum)", lat:-22.7194257, lng:-45.5611975, radius:0, walk:false, mapLabel:"Hotel",
-   text:`Welcome to Campos do Jordão, the highest city in Brazil, at roughly one thousand six hundred and twenty eight meters. That's higher than Denver. As we climb out of Capivari, look at the chalets, the half-timbered facades, and the French hotel names. It's a deliberate European illusion, but the town has a very Brazilian story underneath.
-The name first. The land once belonged to a brigadier named Jordão. He bought a ranch called Fazenda Bonsucesso and renamed it Natal, but everyone simply called it "os Campos do Jordão": Jordão's fields. Back then it was customary to attach the owner's name to the property. So, loosely translated, you are staying in Jordan's Pasture.
-The official founding came in 1874, when Mateus da Costa Pinto formed a small settlement called Vila de São Mateus de Imbiri, named after a nearby stream. It took a long time to grow up. Campos do Jordão only became its own independent municipality in 1934.
-Now look up at the trees. Those tall pines shaped like candelabras are Araucarias, the signature tree of the Serra da Mantiqueira mountains. Their seed, called pinhão, is a beloved winter snack here, boiled or roasted. It's out of season in November, but if you see pinhão on a menu, now you know.
-Our first stop is an outdoor sculpture museum set in native forest. Enjoy the ride.` },
-
- { id:"jaguaribe", name:"Vila Jaguaribe (drive-by)", lat:-22.7287426, lng:-45.583387, radius:350, walk:false, mapLabel:"Jaguaribe", before:"felicia",
-   text:`We're rolling through Vila Jaguaribe, one of the oldest parts of town. Historians say the city started from this little village and spread along the valley of the Capivari stream, which created the neighborhoods you know today.
-And here's a fun one. Capivari comes from the Tupi language and means river of the capybaras, the giant guinea pigs of South America. So the fanciest shopping street in the Brazilian Switzerland is named after a rodent the size of a Labrador.
-In the sanatorium years, Jaguaribe and Abernéssia were packed with boarding houses for patients. Some were run by families who rented every spare room, because the hospitals never had enough beds. Keep an eye out for older wooden houses with deep porches. Porches mattered here: patients were prescribed hours of rest in the open mountain air, wrapped in blankets, every single day.` },
- { id:"mantiqueira", name:"Climbing the Mantiqueira", lat:-22.7365, lng:-45.6045, radius:400, walk:false, mapLabel:"", before:"felicia",
-   text:`We're climbing now on Avenida Adhemar de Barros, toward the Alto da Boa Vista, the "high good view." Watch your ears pop.
-These mountains are the Serra da Mantiqueira, and the name is pure poetry. It comes from the Tupi language and is usually translated as "the mountain that weeps," or "the mountain that cries." The tears are water. These hills are full of springs and streams that feed rivers for millions of people in São Paulo, Minas Gerais, and Rio de Janeiro.
-The Mantiqueira runs for hundreds of kilometers along the border of three states, and its peaks rise to almost three thousand meters. On a clear day from up here you can look down into the Paraíba Valley, the industrial corridor between São Paulo and Rio.
-Up ahead, our first stop: a museum where the art lives outdoors, in the forest.` },
- { id:"mercado", name:"Mercado Municipal (drive-by)", lat:-22.7385814, lng:-45.5927793, radius:150, walk:false, mapLabel:"", after:"felicia",
-   text:`On your side, that's the Municipal Market of Campos do Jordão. Let's be honest: it has seen better days, and locals have been asking for a renovation for years. But markets like this are where the real town shops, away from the Capivari price tags. In season you'll find mountain produce, cheeses, cured meats, and pinhão by the sack in winter.` },
- { id:"teresinha", name:"Igreja Santa Teresinha", lat:-22.7399843, lng:-45.5917832, radius:120, walk:false, mapLabel:"", after:"felicia",
-   text:`Nearby is the parish church of Santa Teresinha, the main church of Abernéssia, dedicated to Saint Thérèse of Lisieux, the French nun known as the Little Flower. Visitors say it looks simple from the outside, but the inside is a surprise, with a beautiful ceiling and colorful stained glass windows. If the door is open and you have five minutes, peek in.` },
-
- { id:"felicia", name:"Museu Felícia Leirner", lat:-22.743852, lng:-45.632977, radius:130, walk:true, mapLabel:"Museum",
-   text:`Welcome to the Felícia Leirner Museum. Nearly ninety sculptures, in bronze, white cement, and granite, are set outdoors along these forest paths.
-The artist's story is wonderful. Felícia, Feiga in the original Polish, was born in Warsaw in 1904 to a family of modest means. Her son remembered that she sang in the chorus of the Warsaw Opera, and that's where his father fell in love with her. She arrived in Brazil in 1927.
-Here's the inspiring part. For two decades she was a São Paulo wife and mother of three. Then, at age forty four, she began studying sculpture with Victor Brecheret, the most famous modernist sculptor in Brazil. Fifteen years later, in 1963, she won Best Brazilian Sculptor at the São Paulo Biennial. Her work is now in collections including the Hermitage in Russia. Never too late.
-Why here? In 1962, shaken by her husband's death, she moved from São Paulo to Campos do Jordão and brought her work with her. She donated the sculptures, and this museum officially opened in 1979. She lived here until she died in 1996, at ninety two.
-As you walk, notice how the pieces change. In the 1950s her themes were motherhood and family. Later she moved into abstraction. She placed many pieces herself, choosing spots in the forest that suited each one. She also wrote poetry, published after her death.
-And look around at the forest itself. This is a remnant of the Atlantic Forest, the Mata Atlântica, which once covered Brazil's coast and is now one of the most threatened ecosystems on Earth. You are walking through something rare.` },
-
- { id:"auditorio", name:"Auditório Claudio Santoro", lat:-22.7427005, lng:-45.6336612, radius:70, walk:true, mapLabel:"",
-   text:`That big building of glass and stone is the Claudio Santoro Auditorium. It seats eight hundred and fourteen people, and it's the main stage of the Campos do Jordão International Winter Festival, the biggest classical music event in Latin America.
-The festival actually started in 1970 inside the Governor's Palace, which we'll pass on the way down. It grew so popular that it needed its own hall. Construction began here in 1975, and the auditorium opened in 1979.
-The namesake has a dramatic story. Claudio Santoro was a composer and conductor born in Manaus, deep in the Amazon. On March twenty seventh, 1989, he was in Brasília conducting the dress rehearsal for the season's first concert, a tribute to the two hundredth anniversary of the French Revolution, when he suffered a massive heart attack on stage. He was sixty nine. He died doing exactly what he loved. That same year, this auditorium and the National Theater in Brasília were both renamed in his honor.
-A fun fact for bossa nova fans: Santoro wrote thirteen songs with the poet Vinícius de Moraes, the lyricist of The Girl from Ipanema.
-If the doors are open, peek inside. The steep seating gives every seat a great view of the stage.` },
-
- { id:"palacio", name:"Palácio Boa Vista (drive-by)", lat:-22.7359333, lng:-45.6127636, radius:350, walk:false, mapLabel:"Palácio",
-   text:`Coming up is the Palácio Boa Vista, the official winter residence of the Governor of São Paulo. It's closed on Mondays and Tuesdays, so today we're admiring it from the road.
-It was a twenty six year construction project. Work started in 1938, ordered by Adhemar de Barros, who was then the federally appointed administrator of São Paulo. It was finished only in 1964, and Adhemar inaugurated it himself on July twenty first, 1964, by then as the elected governor.
-Adhemar de Barros is one of the most colorful figures in Brazilian politics. He was a populist builder, and his supporters' unofficial slogan was "rouba, mas faz," which means "he steals, but he gets things done." Brazilians still use that phrase today for that type of politician. Starting a palace as an appointee and finishing it a quarter century later as governor is a fitting monument to the man. And yes, the avenue we're driving on is named after him too.
-Inside are about three thousand two hundred square meters, thirty five spaces and one hundred and five rooms, with furniture from the seventeenth to the twentieth centuries, porcelain, silver, heavy velvet curtains, and art including Tarsila do Amaral, Brazil's most famous modernist painter. A funny detail: because the governor still uses it, especially on weekends, phones and cameras are not allowed inside.
-In 1970 it was declared a public monument and opened to visitors, and that same year its grand hall hosted the first winter concerts, which grew into the festival we just learned about. If you're still in town Wednesday through Sunday, the guided tour is free.` },
-
- { id:"tb", after:"felicia", name:"The tuberculosis story (drive down)", lat:-22.7365, lng:-45.6045, radius:400, walk:false, mapLabel:"",
-   text:`As we drive downhill, here's the big story nobody tells you in Capivari. This town exists because of tuberculosis.
-In the early twentieth century, the sanitarian doctor Emílio Ribas, who had studied the disease in Europe, decided the cold, dry mountain air of the Mantiqueira was the ideal place for sanatoriums. The fresh air was the treatment.
-The problem was getting sick people up the mountain. Before the railway, the climb was made on foot, on horseback, or in litters carried by enslaved people. So Ribas and his colleague Victor Godinho built a railway. It opened on November fifteenth, 1914, and runs forty seven kilometers, climbing from five hundred and fifty five meters in the Paraíba Valley to nearly one thousand six hundred meters here. A medical footnote: despite Ribas doing much of the pioneering work, history mostly credits Oswaldo Cruz for those public health campaigns. The railway is in the news again, by the way. The state is handing it to a private operator, with plans to bring back the Maria Fumaça steam train.
-The town filled with patients. By the mid 1940s there were fourteen sanatoriums, plus dozens of boarding houses that were never enough. The town was even run as a special "sanitary prefecture" starting in 1926. There's a famous Brazilian novel, Floradas na Serra, about the lives of patients recovering in these boarding houses.
-Then, from the 1950s on, antibiotics defeated tuberculosis, and the town lost its reason to exist. So it reinvented itself as a mountain resort, and leaned into Swiss and German architecture to attract tourists. The Brazilian Switzerland is the rebrand of a former hospital town.` },
-
- { id:"abernessia", after:"felicia", name:"Vila Abernéssia", lat:-22.7382467, lng:-45.5919284, radius:300, walk:false, mapLabel:"Abernéssia",
-   text:`Welcome to Abernéssia, the Scottish neighborhood. This district was built by a Scottish engineer named Robert John Reid, born in Aberdeen and educated at Oxford. He was a very tall man, and he used to walk around town wearing a traditional kilt. Picture that in rural Brazil a hundred years ago.
-The name Abernéssia doesn't exist in Scotland. Reid invented it. A local historian says it blends Aberdeen, where Reid was born, Inverness, and Escócia, the Portuguese word for Scotland. The area used to be called simply Vila Nova, the New Village. Then Reid donated land for the train station and insisted it carry the same name as his own property. Classic move: donate the land, name the station.
-He was paid for his surveying work in land, and as that historian put it, he became very rich in land, but at the time land up here was worth almost nothing. His heirs probably feel differently today.
-Look for the Abernéssia train station. It first opened in 1919 and was rebuilt in 1975, in a style that recalls old Scottish railway stations.
-This is the real working town. City hall, the courthouse, the municipal market, pharmacies and shops are here, and this is also where most of the old sanatoriums stood. Capivari's Swiss look is the top layer. Underneath is this older town of Scots, doctors, and patients.
-Today the local economy runs almost entirely on tourism, especially in July, when the Winter Festival and the cold weather crowds from São Paulo fill the town. Local specialties include trout farmed in the mountain streams, artisanal chocolate, and craft beer. Enjoy lunch.` },
-
- { id:"mosteiro", name:"Mosteiro de São João", lat:-22.7362131, lng:-45.5958014, radius:90, walk:true, mapLabel:"Mosteiro",
-   text:`Welcome to the Monastery of Saint John, home to Benedictine nuns. They belong to the oldest religious order in the Western world, founded by Saint Benedict in Italy in the year 529.
-The monastery was founded in 1964, the same year the Governor's Palace up the hill was finished, on the very same avenue. That year the governor got his palace and the nuns got their monastery.
-The Benedictine motto is "ora et labora," pray and work, and the shop is the work part. By tradition, the nuns live from their own labor: cookies, breads, cakes, jams, and handicrafts. There's a social side too. Through a "Mothers' Club," women from low income families learn crafts and help the nuns make the sweets sold in the shop.
-A shopping tip for anyone watching saturated fat: the nuns' jams, called geleias, are essentially fat free. Pair them with plain bread rather than the butter cakes. The shop also sells famous handmade chocolates made by Trappist nuns in Santa Catarina, so that's nun to nun chocolate, from more than five hundred kilometers away.
-Wander down the path through the cypress grove to the little lake and the grotto. It's a place made for slowing down.
-And if you're still in town at a quarter to six this evening, the nuns sing Vespers in the chapel, with Gregorian chant in Latin, Greek, and Portuguese. It's free and open to everyone. The shop closes for a break from about a quarter to three until half past three, so shop first.
-Thank you for joining the tour. I hope Campos do Jordão now feels like more than chocolate and chalets.` }
-];
-
-
-
-
-const MUSEUM = [
- {id:"m_start", name:"How to walk the museum", look:"Look for: the map board and phase signs", text:`Welcome to the walking part of the museum. Here's how it works. The sculptures are laid out along forest paths in five sections, one for each phase of Felícia's career, and the artist herself chose where many of them stand. Signs mark each phase and show how steep each path is. There are a few climbs, so take it slow. Every sculpture has a small plaque with its name, material, and phase, and some have QR codes with more information. Tap the next track in the Museum walk list each time you reach a new phase sign. The whole loop takes about an hour at an easy pace. And remember: this is a living garden, with more than a hundred species of Mantiqueira plants, so look up as often as you look at the art.`},
- {id:"m_figurative", name:"Phase 1 · Figurative (1950 to 1958)", look:"Look for: bronze figures, mothers and children", text:`This is where it all began: the Figurative phase, from 1950 to 1958, mostly in bronze. Remember, Felícia only started sculpting at forty four, studying with Victor Brecheret, the sculptor behind the giant Monument to the Bandeirantes in São Paulo's Ibirapuera Park. You can feel his influence in these smooth, heavy, monumental forms.
-Her subjects here are human, and very personal: mothers, children, couples, families. She had spent twenty years raising three children, and that life is right here in bronze. Look at how the figures lean into each other, and how arms and bodies merge into a single shape.
-She was good, and fast. In 1955 she won an acquisition prize from the Museum of Modern Art in Rio de Janeiro, and by 1957 her sculptures had entered the collections of the São Paulo Museum of Art, MASP, and the Museum of Modern Art in Paris.`, quiz:{ask:"In this first phase, what were Felícia's favorite subjects?", ans:"People: mothers, children, couples and families."}},
- {id:"m_toward", name:"Phase 2 · Toward abstraction (1958 to 1961)", look:"Look for: figures starting to dissolve into shapes", text:`Now watch the people start to disappear. This is the phase called A Caminho da Abstração, on the way to abstraction, from 1958 to 1961.
-What changed? The São Paulo Biennial. Starting in 1951, this huge international exhibition brought the newest European and American art to Brazil, and it shook up a whole generation of artists. Felícia exhibited there, saw abstract art up close, and began to loosen her grip on the human figure.
-Play a game here: in each sculpture, try to find the person who is still hiding inside. Sometimes it's a head, sometimes the curve of a back, sometimes just a gesture. A few years earlier these would have been obvious figures. Now they're halfway to pure form.`},
- {id:"m_abstract", name:"Phase 3 · Abstract (1963 to 1965)", look:"Look for: sculptures set in alleys and semicircles", text:`Welcome to the Abstract phase, 1963 to 1965. The figures are gone. What's left is pure form, texture, and rhythm.
-Notice how these pieces are displayed, in alleys and semicircles, surrounded by Mantiqueira plants. Walk around them. Abstract sculpture changes completely depending on where you stand, and on the light through the trees.
-This is the phase of her biggest honor. In 1963, at the São Paulo Biennial, the same exhibition that had transformed her style, Felícia was named Best Brazilian Sculptor. Not bad for someone who had picked up her first sculpting tools just fifteen years earlier.
-It was also a time of grief and change. In 1962 her husband died, and she left São Paulo to live here in Campos do Jordão, closer to nature. Keep that in mind for the next phase, because nature is about to take over her work.`, quiz:{ask:"What award did Felícia win at the 1963 São Paulo Biennial?", ans:"Best Brazilian Sculptor."}},
- {id:"m_organic", name:"Phase 4 · Organic (1966 to 1970)", look:"Look for: white reinforced-cement shapes like seeds and stones", text:`This is the Organic phase, from 1966 to 1970, and the material changes too: reinforced cement instead of bronze.
-By now Felícia was living up here in the mountains, and you can see it. These shapes feel grown rather than made. Look for forms that remind you of seeds, pods, river stones, bones, or shells. Nothing here has a straight edge, because almost nothing in a forest does.
-Here's a detail many visitors miss: these sculptures are a lot of work to keep. They stand outdoors all year in mountain rain, sun, and frost, so the museum runs a permanent conservation program to keep them from wearing away.
-Nearby you may also find a series called Bichos, which means critters, or little animals. See which creatures you can spot among the trees.`},
- {id:"m_recortes", name:"Phase 5 · Recortes na Paisagem (1980 to 1982)", look:"Look for: cut-out shapes among the Araucaria pines", text:`The final phase, and the one made for this exact place: Recortes na Paisagem, cut-outs in the landscape, from 1980 to 1982. Felícia was in her late seventies when she made them.
-These pieces stand among the Araucaria pines on purpose. Try this: crouch down and look through the openings and gaps in each sculpture. They frame the forest, the sky, and the mountains like windows. The landscape becomes part of the artwork, and the artwork becomes a way of looking at the landscape.
-It's a beautiful ending to a career that began with bronze mothers and children in a São Paulo studio. Thirty years later, the subject is this mountain itself. She finished her work for the museum in 1982, and lived here until she died in 1996, at ninety two.`, quiz:{ask:"What does Recortes na Paisagem mean?", ans:"Cut-outs in the landscape. The sculptures frame the forest like windows."}},
- {id:"m_concha", name:"The acoustic shell and the view", look:"Look for: Pedra do Baú on the horizon", text:`Before you leave, find the concha acústica, the outdoor acoustic shell. It's used for concerts and cultural events, and on a clear day it has one of the best views on the property.
-Look to the horizon for Pedra do Baú, a huge granite rock formation shaped a bit like a trunk or a chest. Baú means trunk in Portuguese. At almost two thousand meters, it's one of the most famous landmarks of the Mantiqueira, and climbers come from all over Brazil to scale it on iron rungs fixed into the rock.
-Take a moment here. You've just walked through thirty years of one woman's life, from Warsaw to Campos do Jordão. When you're ready, head back toward the auditorium, and don't forget to arrange your ride back down.`}
-];
-
-const LOOKDETAIL = {
- m_start:{sign:"Start at the map board near the entrance. Phase signs name each section and show how steep the path is.", art:"Every sculpture has a small plaque: name, material, and phase. Some have QR codes."},
- m_figurative:{sign:"Sign: <b>Fase Figurativa</b> (1950 to 1958)", art:"Dark bronze human figures: mothers with children, couples, families, with smooth heavy forms and bodies merging together."},
- m_toward:{sign:"Sign: <b>A Caminho da Abstração</b> (1958 to 1961)", art:"Figures dissolving into shapes. Hunt for the hidden person: a head, a curved back, a gesture."},
- m_abstract:{sign:"Sign: <b>Fase Abstrata</b> (1963 to 1965)", art:"Pure shapes, no figures, set along alleys and in semicircles among Mantiqueira plants. Walk all the way around them."},
- m_organic:{sign:"Sign: <b>Fase Orgânica</b> (1966 to 1970)", art:"White or gray reinforced cement, rounded like seeds, pods, river stones or shells. Nearby, look for the <b>Bichos</b> (little animals) series."},
- m_recortes:{sign:"Sign: <b>Recortes na Paisagem</b> (1980 to 1982)", art:"Pieces with openings and cut-outs, standing among the Araucaria pines. Crouch and look through the gaps to frame the forest."},
- m_concha:{sign:"Find the <b>concha acústica</b>, the outdoor acoustic shell.", art:"On the horizon: <b>Pedra do Baú</b>, a giant granite block shaped like a trunk, almost 2,000 m high."}
-};
-const ORDER=['drive1','jaguaribe','mantiqueira','felicia','auditorio','palacio','tb','abernessia','mercado','teresinha','mosteiro'];
-STOPS.sort((a,b)=>ORDER.indexOf(a.id)-ORDER.indexOf(b.id));
-const FILLERS = [
- {id:"f_ribas", name:"Story: the doctor who let mosquitoes bite him", text:`While we drive, a story about Emílio Ribas, the doctor behind this town's railway. In the early 1900s, many doctors still believed yellow fever spread through dirty clothes and bedding. Ribas believed the real culprit was a mosquito. To prove it, he and fellow volunteers let themselves be bitten by mosquitoes that had fed on yellow fever patients. They got sick, they survived, and the experiment helped convince Brazil to fight the mosquito instead of burning patients' sheets. Today São Paulo's main infectious disease hospital is named after him: the Instituto Emílio Ribas.`},
- {id:"f_araucaria", name:"Story: the tree and the forgetful bird", text:`Look out the window for the Araucaria pines, the ones shaped like candelabras. Their family is ancient. Their ancestors were around in the age of the dinosaurs. Today the Paraná pine is critically endangered, after a century of logging. There's a lovely legend about how these forests spread. A bird called the gralha azul, the azure jay, buries pinhão seeds to eat later, then forgets where it hid many of them. The forgotten seeds sprout. So, the story goes, a forgetful blue bird has been planting these forests for thousands of years.`},
- {id:"f_food", name:"Story: what to eat in the mountains", text:`Let's talk food. Mountain food here is cold weather food, and Brazilians drive hours for it. Fondue, of cheese and of chocolate, is practically a religion in July. Trout is raised in the cold mountain streams and shows up grilled, smoked, or in pâté. Chocolate shops line Capivari, and craft beer is big too. And in winter, the star is pinhão, the Araucaria seed: boiled, roasted on a wood stove, or ground into a sweet paçoca. For anyone watching saturated fat, grilled trout is your best friend on these menus.`},
- {id:"f_winter", name:"Story: Brazil's winter capital", text:`Here's the strange thing about Campos do Jordão: most of Brazil is warm all year, so cold is the attraction. In July, during school holidays and the Winter Festival, the town's population can multiply, roads jam, and hotel prices soar. Paulistanos come up to wear the wool coats they never get to use at home, sit by fireplaces, and eat fondue. Some winter nights the temperature drops below freezing and the fields turn white with frost. You're here in spring, which means fewer crowds, lower prices, and the hydrangeas starting to bloom.`},
- {id:"f_swiss", name:"Story: how a hospital town became Switzerland", text:`Think about the timeline. In the 1940s, this was a town of sanatoriums, coughing patients, and boarding houses. Healthy visitors were nervous to come. When antibiotics arrived and tuberculosis retreated, the town needed a new identity, fast. Developers and city leaders leaned into a European fantasy: chalets, half timbering, Swiss and German names, fondue. It worked brilliantly. The nickname "the Brazilian Switzerland" stuck. But every time you see a postcard chalet, remember it's a costume, worn by a town that was built to heal.`},
- {id:"f_cafe", name:"Story: coffee with milk politics", text:`Look at a map and you'll see we're right near the border between São Paulo and Minas Gerais. Those two states once ran Brazil between them. In the early republic, from the 1890s to 1930, power famously alternated between São Paulo, the coffee giant, and Minas Gerais, the dairy and cattle state. Brazilians nicknamed it the politics of café com leite, coffee with milk. The arrangement collapsed in 1930, when Getúlio Vargas took power in a revolution and went on to rule Brazil for most of the next fifteen years.`},
- {id:"f_1932", name:"Story: São Paulo's war of 1932", text:`Two years after Vargas took power, São Paulo rebelled. In July 1932 the state rose up demanding a new constitution, in what's called the Constitutionalist Revolution. It was a real war, with trenches, artillery, and volunteers, and some of the fighting was in these very mountains: the Mantiqueira passes on the border with Minas Gerais, including the famous railway tunnel near Cruzeiro, were front lines. São Paulo lost within three months, but Vargas did call a constitutional assembly. July ninth is still a state holiday here.`},
- {id:"f_hydrangea", name:"Story: the flowers that change color", text:`Keep an eye out for hortênsias, hydrangeas, which love this mountain climate and start blooming around now, in spring. Here's the magic trick: the same plant can be blue or pink depending on the soil. In acidic soil, the plant can absorb aluminum, and the flowers turn blue. In more alkaline soil, they turn pink. So the color of a hydrangea is basically a soil test you can see from the road.`},
- {id:"f_boil", name:"Story: why pasta takes longer up here", text:`A fun bit of altitude science. At sea level, water boils at one hundred degrees Celsius. Up here, at about sixteen hundred meters, the air pressure is lower, so water boils at around ninety five degrees. That means your pasta and beans cook in slightly cooler water and take longer. It's also why mountain cooks love pressure cookers, which are in nearly every Brazilian kitchen anyway. And pilots will appreciate this: the thinner air is the same reason engines and wings lose performance at high-altitude airports.`},
- {id:"f_embraer", name:"Story: the aerospace valley below us", text:`Down in the Paraíba Valley, about an hour from here, is São José dos Campos, the heart of Brazil's aerospace industry. It's home to Embraer, founded in 1969, now one of the world's biggest makers of regional jets, and to ITA, the Aeronautics Institute of Technology, one of Brazil's toughest engineering schools. Brazil's national space research institute, INPE, is there too. So the valley that once carried tuberculosis patients up this mountain by train now builds airplanes that fly all over the world.`},
- {id:"f_pix", name:"Story: how Brazil pays", text:`You'll notice almost nobody here pays with cash. That's thanks to Pix, an instant payment system launched by Brazil's Central Bank in November 2020. You scan a QR code or type a phone number, and the money arrives in seconds, for free, any hour of the day. It spread incredibly fast. Street vendors, taxis, and tiny market stalls all take it. Many Brazilians now use it more than credit cards, and other countries study it as a model.`},
- {id:"f_capybara", name:"Story: the capybara, mascot of Capivari", text:`Back to the animal that named Capivari. The capybara is the largest rodent in the world, often weighing over fifty kilos. It's semi-aquatic, with slightly webbed feet, and can stay underwater for several minutes to hide from predators. Capybaras are famously calm and social. Online they've become known as the chillest animal on Earth, often photographed with birds, monkeys, or even other animals sitting on their backs. So when you walk through fancy Capivari tonight, remember: it's named after a giant, relaxed guinea pig.`},
- {id:"f_cafezinho", name:"Story: the cafezinho", text:`If you visit someone in Brazil, or even an office or a shop, there's a good chance you'll be offered a cafezinho, a little coffee. It's a small, strong, usually very sweet black coffee, and offering one is a basic gesture of hospitality. Saying yes is polite, and it often starts a conversation. Brazil has been the world's largest coffee producer for more than a century, so the cafezinho is the national handshake. Tip for the low sugar crowd: ask for it "sem açúcar," without sugar.`}
-];
-
-
-const WALKSTORIES = [
- {id:"w_route", name:"Walk: Abernéssia on foot", text:`Here's your walking route through Abernéssia. The monastery sits at number 330 on Avenida Doutor Adhemar de Barros, the same avenue that climbs all the way up to the Governor's Palace. Walk downhill along it and the numbers drop. At number 26, near the bottom, is the Municipal Market. From there the Abernéssia train station is just a block away on Avenida Doutor Januário Miraglia, the main street of the working town. The church of Santa Teresinha is a short walk further, on Rua Tadeu Rangel Pestana. All of it fits in about fifteen minutes of easy, mostly downhill walking. The walking guide arrow at the top of the app will point the way.`},
- {id:"w_calcada", name:"Walk: watch the sidewalks", text:`A practical tip while we walk. In many Brazilian towns, each property owner is responsible for the sidewalk in front of their building. So the sidewalk can change every few meters: smooth stone, then broken tile, then a steep ramp into a garage, then a tree root. Locals walk looking down for a reason. Take it slow, especially downhill, and watch for steps and drainage gaps.`},
- {id:"w_signs", name:"Walk: reading the street", text:`Let's learn to read the street signs as we walk. Padaria is a bakery, and in Brazil it's also a café and snack bar. Farmácia is a pharmacy, and Drogaria means the same thing. Lanchonete is a snack bar. Açougue is a butcher. Mercado or supermercado is a grocery store. Rua is street, Avenida is avenue, and Praça is a square. And if you see "Aberto," it's open. "Fechado" means closed.`},
- {id:"w_padaria", name:"Walk: padaria culture", text:`If you pass a padaria, it's worth a peek inside. Brazilians stand at the counter for a quick pingado, coffee with a splash of milk, and a pão na chapa, a roll toasted on the griddle with butter. The famous pão de queijo, cheese bread, comes from the neighboring state of Minas Gerais, just across these mountains. For the low saturated fat crowd, the better padaria picks are a plain pão francês, fresh fruit juice, or a black coffee, and go easy on the cheese bread and the butter.`}
-];
-
-const QUIZ = {
- drive1:{ask:"Who was listening? Who is the town named after?", ans:"Brigadier Jordão, who owned the land. You're staying in Jordan's Pasture!"},
- felicia:{ask:"How old was Felícia when she started sculpting? Twenty four, forty four, or sixty four?", ans:"Forty four. Never too late!"},
- auditorio:{ask:"Which famous bossa nova lyricist wrote songs with Claudio Santoro?", ans:"Vinícius de Moraes, who wrote The Girl from Ipanema."},
- palacio:{ask:"How long did it take to build the palace? Six, sixteen, or twenty six years?", ans:"Twenty six years, from 1938 to 1964."},
- tb:{ask:"What was the mountain railway originally built to carry?", ans:"Tuberculosis patients, up to the sanatoriums."},
- abernessia:{ask:"The made up name Abernéssia blends which two Scottish places?", ans:"Aberdeen and Inverness, plus Escócia, Portuguese for Scotland."},
- jaguaribe:{ask:"What animal is the Capivari stream named after?", ans:"The capybara, the world's largest rodent!"},
- mantiqueira:{ask:"The Tupi name Mantiqueira is often translated as what?", ans:"The mountain that weeps, for all its springs and streams."},
- mosteiro:{ask:"What does the Benedictine motto, ora et labora, mean?", ans:"Pray and work. The shop is the work part!"}
-};
-const LOOK = { jaguaribe:"Look for: old wooden houses with deep porches", mantiqueira:"Look for: views down into the Paraíba Valley", mercado:"Look for: the Municipal Market on Av. Adhemar de Barros", teresinha:"Look for: the parish church of Santa Teresinha", drive1:"Look for: tall candelabra-shaped Araucaria pines", felicia:"Look for: bronze and cement shapes among the trees", auditorio:"Look for: the glass and stone concert hall",
-  palacio:"Look for: the Tudor-style palace with its tower", tb:"Look for: old sanatorium buildings and the rail line", abernessia:"Look for: the Abernéssia train station", mosteiro:"Look for: the cypress grove, lake and grotto" };
-const AR = (x,y,s)=>`<g transform="translate(${x},${y}) scale(${s})"><rect x="-2" y="-60" width="4" height="60" fill="#5a4030"/><path d="M0,-62 q-30,-4 -40,4 M0,-62 q30,-4 40,4 M0,-50 q-26,-2 -34,6 M0,-50 q26,-2 34,6" stroke="#2f5a3a" stroke-width="7" fill="none" stroke-linecap="round"/><ellipse cx="0" cy="-66" rx="26" ry="6" fill="#2f5a3a"/></g>`;
-const SKY = (a,b)=>`<defs><linearGradient id="sk" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${a}"/><stop offset="1" stop-color="${b}"/></linearGradient></defs><rect width="400" height="225" fill="url(#sk)"/>`;
-const HILLS = `<path d="M0,150 L60,95 L110,130 L170,80 L240,135 L300,90 L360,125 L400,100 L400,225 L0,225Z" fill="#7a9c86"/><path d="M0,175 Q100,140 200,170 T400,160 L400,225 L0,225Z" fill="#5c8569"/>`;
-const SCENES = {
- drive1:{c:"Climbing out of Capivari", ox:"30%", oy:"60%", tx:"3%", ty:"-2%", svg:`${SKY('#9cc6e8','#e9f2f6')}<circle cx="330" cy="45" r="18" fill="#ffd77a"/>${HILLS}
-   <g><path d="M70,190 l30,-25 l30,25z" fill="#8a3b2b"/><rect x="76" y="190" width="48" height="26" fill="#f2e6d0"/><path d="M76,195h48M100,190v26M76,205h48" stroke="#5a3a2a" stroke-width="2"/></g>
-   <g><path d="M250,195 l26,-22 l26,22z" fill="#8a3b2b"/><rect x="255" y="195" width="42" height="22" fill="#f6efe2"/><path d="M255,200h42M276,195v22" stroke="#5a3a2a" stroke-width="2"/></g>
-   ${AR(170,200,1.1)}${AR(350,205,0.9)}${AR(30,210,0.8)}`},
- felicia:{c:"Sculptures in the Atlantic Forest", ox:"60%", oy:"55%", tx:"-4%", ty:"-1%", svg:`${SKY('#bcd9c4','#e8f1ea')}<rect y="150" width="400" height="75" fill="#6f9a72"/>${AR(40,170,1.2)}${AR(360,165,1.3)}${AR(300,150,0.8)}
-   <path d="M150,200 q-10,-60 20,-80 q30,20 15,80z" fill="#8b6b4a"/><circle cx="168" cy="130" r="10" fill="#8b6b4a"/>
-   <path d="M215,205 c0,-40 50,-40 50,-80 c10,30 -10,60 10,80z" fill="#d9d4c7" stroke="#b8b2a3"/>
-   <ellipse cx="200" cy="208" rx="120" ry="6" fill="#557a58" opacity=".6"/>`},
- auditorio:{c:"Auditório Claudio Santoro", ox:"50%", oy:"45%", tx:"-2%", ty:"2%", svg:`${SKY('#a9cbe3','#eef4f7')}${HILLS}
-   <path d="M90,170 L200,95 L310,170Z" fill="#7d6a58"/><path d="M110,170 L200,110 L290,170Z" fill="#9ec4d8" opacity=".9"/>
-   <path d="M140,170V145M170,170V125M200,170V110M230,170V125M260,170V145" stroke="#5c4d40" stroke-width="2"/>
-   <rect x="80" y="170" width="240" height="20" fill="#6b5a4a"/>${AR(50,200,1)}${AR(355,200,1.1)}
-   <g fill="#1d2420"><text x="150" y="88" font-size="14">♪</text><text x="245" y="80" font-size="18">♫</text></g>`},
- palacio:{c:"Palácio Boa Vista", ox:"45%", oy:"50%", tx:"2%", ty:"-2%", svg:`${SKY('#8fb9de','#eaf1f6')}<rect y="175" width="400" height="50" fill="#6e9670"/>
-   <rect x="100" y="110" width="200" height="70" fill="#efe6d6"/><path d="M95,112 L200,80 L305,112Z" fill="#8a3b2b"/>
-   <rect x="185" y="55" width="30" height="125" fill="#e6dcc9"/><path d="M180,58 L200,35 L220,58Z" fill="#8a3b2b"/>
-   <g stroke="#5a3a2a" stroke-width="3"><path d="M100,130h200M100,155h200M130,110v70M160,110v70M240,110v70M270,110v70"/></g>
-   <rect x="192" y="150" width="16" height="30" fill="#5a3a2a"/>${AR(40,190,1.1)}${AR(360,192,1.2)}`},
- tb:{c:"The sanatorium railway, 1914", ox:"40%", oy:"60%", tx:"-4%", ty:"-1%", svg:`${SKY('#d8cdb8','#f3eee4')}${HILLS}
-   <path d="M0,195 L400,175" stroke="#4a3a2e" stroke-width="4"/><path d="M0,201 L400,181" stroke="#4a3a2e" stroke-width="2"/>
-   <g transform="translate(120,150) rotate(-3)"><rect x="0" y="10" width="80" height="30" rx="4" fill="#2f2f2f"/><rect x="55" y="-8" width="25" height="24" fill="#3a3a3a"/><rect x="12" y="-6" width="10" height="18" fill="#2f2f2f"/>
-   <circle cx="18" cy="44" r="8" fill="#555"/><circle cx="62" cy="44" r="8" fill="#555"/><rect x="85" y="12" width="70" height="26" rx="3" fill="#8a3b2b"/><path d="M92,18h12M112,18h12M132,18h12" stroke="#f3e2b0" stroke-width="6"/></g>
-   <g fill="#fff" opacity=".85"><circle cx="138" cy="130" r="9"/><circle cx="152" cy="116" r="12"/><circle cx="172" cy="100" r="15"/></g>
-   <rect x="300" y="120" width="70" height="45" fill="#f4efe4"/><path d="M295,122 L335,100 L375,122Z" fill="#7a6a5a"/><path d="M308,132h12M330,132h12M352,132h12M308,148h12M330,148h12M352,148h12" stroke="#7aa3c2" stroke-width="7"/>`},
- abernessia:{c:"Vila Abernéssia, a Scottish legacy", ox:"55%", oy:"55%", tx:"3%", ty:"-2%", svg:`${SKY('#a3c3d9','#edf2f5')}<rect y="185" width="400" height="40" fill="#9a9a90"/>
-   <rect x="120" y="120" width="160" height="65" fill="#e8dcc8"/><path d="M112,122 L200,88 L288,122Z" fill="#5d4a3c"/><path d="M120,140h160" stroke="#5d4a3c" stroke-width="3"/>
-   <rect x="150" y="150" width="20" height="35" fill="#5d4a3c"/><rect x="230" y="150" width="20" height="35" fill="#5d4a3c"/><rect x="185" y="145" width="30" height="16" fill="#7aa3c2"/>
-   <text x="200" y="135" text-anchor="middle" font-size="10" font-weight="700" fill="#3a2a20">ABERNÉSSIA</text>
-   <g transform="translate(330,150)"><circle cx="0" cy="0" r="7" fill="#e7c09a"/><rect x="-6" y="7" width="12" height="16" fill="#2d4a7a"/><path d="M-8,23 h16 l2,12 h-20z" fill="#b22222"/><path d="M-8,27h20M-4,23v12M3,23v12" stroke="#1d3a6a" stroke-width="2"/><rect x="-5" y="35" width="3" height="12" fill="#e7c09a"/><rect x="2" y="35" width="3" height="12" fill="#e7c09a"/></g>
-   ${AR(50,200,1)}`},
- mosteiro:{c:"Mosteiro de São João", ox:"50%", oy:"55%", tx:"-3%", ty:"-2%", svg:`${SKY('#c9dcea','#f3f6f2')}<rect y="170" width="400" height="55" fill="#6f9a72"/>
-   <g fill="#2f4a36"><path d="M40,175 q12,-90 24,0z"/><path d="M75,175 q12,-100 24,0z"/><path d="M320,175 q12,-95 24,0z"/><path d="M355,175 q12,-85 24,0z"/></g>
-   <rect x="150" y="115" width="100" height="60" fill="#f1ebdf"/><path d="M142,118 L200,85 L258,118Z" fill="#8a3b2b"/><rect x="192" y="60" width="16" height="28" fill="#f1ebdf"/><path d="M200,45v15M193,52h14" stroke="#5a3a2a" stroke-width="3"/>
-   <path d="M190,175v-25a10,10 0 0 1 20,0v25z" fill="#5a3a2a"/><ellipse cx="290" cy="200" rx="50" ry="10" fill="#7fb0c9"/><ellipse cx="290" cy="198" rx="30" ry="4" fill="#cfe6f0" opacity=".7"/>`}
-};
-const SCENE_ALIAS={jaguaribe:'drive1',mantiqueira:'tb',mercado:'abernessia',teresinha:'mosteiro'};
-function showLook(id){ const l=LOOKDETAIL[id]; $('lookCard').style.display=l?'':'none'; if(l){ $('lookSign').innerHTML=l.sign; $('lookArt').innerHTML=l.art; } }
-function showScene(id){
-  const s=SCENES[id]||SCENES[SCENE_ALIAS[id]]||(String(id).startsWith('f_')?SCENES.drive1:null)||(String(id).startsWith('m_')?SCENES.felicia:null)||(String(id).startsWith('w_')?SCENES.abernessia:null); const p=STOPS.find(x=>x.id===id); if(!s) return;
-  const ph = PHOTOS[id] || (SCENE_ALIAS[id] && PHOTOS[SCENE_ALIAS[id]]) || (String(id).startsWith('m_') && PHOTOS.felicia);
-  const cap = `<div class="cap fade">${(STOPS.find(x=>x.id===id)||FILLERS.find(x=>x.id===id)||MUSEUM.find(x=>x.id===id)||WALKSTORIES.find(x=>x.id===id)||{}).name||s.c}<small>${LOOK[id]||(MUSEUM.find(x=>x.id===id)||{}).look||(String(id).startsWith('f_')?'Story time while we drive':String(id).startsWith('w_')?'Story time while we walk':'')}</small></div>`;
-  if(ph){
-    $('stage').innerHTML = `<img class="scene fade" src="${ph.url}" alt="" style="--ox:${s.ox};--oy:${s.oy};--tx:${s.tx};--ty:${s.ty}"><div class="credit">${ph.credit}</div>`+cap;
-    $('stage').querySelector('img').onerror=()=>{ delete PHOTOS[id]; showScene(id); };
-    return;
-  }
-  $('stage').innerHTML = `<svg class="scene fade" viewBox="0 0 400 225" preserveAspectRatio="xMidYMid slice" style="--ox:${s.ox};--oy:${s.oy};--tx:${s.tx};--ty:${s.ty}">${s.svg}</svg><div class="cap fade">${(STOPS.find(x=>x.id===id)||FILLERS.find(x=>x.id===id)||MUSEUM.find(x=>x.id===id)||{}).name||s.c}<small>${LOOK[id]||(MUSEUM.find(x=>x.id===id)||{}).look||(String(id).startsWith('f_')?'Story time while we drive':'')}</small></div>`;
-}
-
-const PHOTO_Q = { m_start:"Museu Felícia Leirner", m_figurative:"Felícia Leirner bronze escultura", m_toward:"Felícia Leirner escultura museu", m_abstract:"Felícia Leirner escultura abstrata", m_organic:"Felícia Leirner escultura cimento", m_recortes:"Felícia Leirner Recortes na Paisagem", m_concha:"Pedra do Baú", w_route:"Abernéssia Campos do Jordão", drive1:"Capivari Campos do Jordão", jaguaribe:"Campos do Jordão cidade", mantiqueira:"Serra da Mantiqueira Campos do Jordão",
- felicia:"Museu Felícia Leirner", auditorio:"Auditório Claudio Santoro", palacio:"Palácio Boa Vista Campos do Jordão",
- tb:"Estrada de Ferro Campos do Jordão", abernessia:"Abernéssia Campos do Jordão", mercado:"Mercado Municipal Campos do Jordão",
- teresinha:"Santa Teresinha Campos do Jordão", mosteiro:"Mosteiro São João Campos do Jordão", f_araucaria:"Araucaria angustifolia forest",
- f_swiss:"Capivari Campos do Jordão", f_winter:"Campos do Jordão inverno", f_food:"Campos do Jordão Capivari restaurante", f_ribas:"Estrada de Ferro Campos do Jordão trem" };
-let PHOTOS = {};
-function strip(s){ const d=document.createElement('div'); d.innerHTML=s||''; return (d.textContent||'').trim(); }
-async function fetchPhotos(){
-  if(!navigator.onLine) return;
-  for(const [id,q] of Object.entries(PHOTO_Q)){
-    if(PHOTOS[id]) { new Image().src=PHOTOS[id].url; continue; }
-    try{
-      const u='https://commons.wikimedia.org/w/api.php?action=query&format=json&origin=*&generator=search&gsrnamespace=6&gsrlimit=5&prop=imageinfo&iiprop=url|extmetadata|mime&iiurlwidth=1000&gsrsearch='+encodeURIComponent(q+' filetype:bitmap');
-      const r=await fetch(u); const j=await r.json(); const pages=Object.values((j.query||{}).pages||{}).sort((a,b)=>(a.index||0)-(b.index||0));
-      const pg=pages.find(p=>p.imageinfo&&p.imageinfo[0].thumburl&&/jpe?g|png|webp/i.test(p.imageinfo[0].mime||''));
-      if(!pg) continue;
-      const ii=pg.imageinfo[0], m=ii.extmetadata||{};
-      PHOTOS[id]={url:ii.thumburl, credit:'Photo: '+(strip(m.Artist&&m.Artist.value)||'Wikimedia Commons').slice(0,40)+' · '+(strip(m.LicenseShortName&&m.LicenseShortName.value)||'')+' · Wikimedia Commons'};
-      store.set('cdj_photos',PHOTOS);
-      new Image().src=ii.thumburl;
-      if(current && current.stop.id===id) showScene(id);
-    }catch(e){}
-  }
-}
-
-let qTimer=null;
-function quizUI(mode, id, n){
-  const q=QUIZ[id]; const box=$('quiz');
-  if(mode==='hide'){ box.style.display='none'; return; }
-  box.style.display='block'; $('qt').textContent=q.ask;
-  if(mode==='ask'){ $('qa').style.display='none'; $('qc').textContent=''; }
-  if(mode==='count'){ $('qc').textContent=n; }
-  if(mode==='answer'){ $('qc').textContent=''; $('qa').style.display='block'; $('qa').textContent='✅ '+q.ans; }
-}
-
-// ---------- state ----------
-const $ = id => document.getElementById(id);
-const store = { get(k,d){ try{ const v=localStorage.getItem(k); return v===null?d:JSON.parse(v);}catch(e){return d;} },
-                set(k,v){ try{ localStorage.setItem(k,JSON.stringify(v)); }catch(e){} } };
-PHOTOS = store.get('cdj_photos', {});
-let played = new Set(store.get('cdj_played', []));
-let queue = [];          // stop ids waiting
-let current = null;      // {stop, sentences, idx}
-let paused = false;
-let voices = [];
-let lastFix = null, prevFix = null;
-let started = false;
-let lastActivity = Date.now();
-let wakeLock = null;
-const synth = window.speechSynthesis;
-
-// ---------- geo helpers ----------
-function dist(a,b,c,d){ const R=6371000, t=Math.PI/180; const dLa=(c-a)*t, dLo=(d-b)*t;
-  const x=Math.sin(dLa/2)**2+Math.cos(a*t)*Math.cos(c*t)*Math.sin(dLo/2)**2; return 2*R*Math.asin(Math.sqrt(x)); }
-function fmt(m){ return m<1000? Math.round(m)+' m' : (m/1000).toFixed(1)+' km'; }
-
-// ---------- map ----------
-const pts = STOPS.concat([]);
-const lats = pts.map(p=>p.lat), lngs = pts.map(p=>p.lng);
-const pad = 0.004;
-const minLat=Math.min(...lats)-pad, maxLat=Math.max(...lats)+pad, minLng=Math.min(...lngs)-pad, maxLng=Math.max(...lngs)+pad;
-const W=400, H=260;
-const kx = Math.cos(-22.73*Math.PI/180);
-const sx = W/((maxLng-minLng)*kx), sy = H/(maxLat-minLat), s=Math.min(sx,sy);
-const ox = (W-(maxLng-minLng)*kx*s)/2, oy=(H-(maxLat-minLat)*s)/2;
-function proj(lat,lng){ return [ox+(lng-minLng)*kx*s, oy+(maxLat-lat)*s]; }
-function drawMap(){
-  const svg=$('map'); let h='';
-  const route = ['drive1','jaguaribe','abernessia','mantiqueira','palacio','felicia','palacio','tb','mosteiro','abernessia'].map(id=>STOPS.find(x=>x.id===id));
-  h+=`<polyline points="${route.map(p=>proj(p.lat,p.lng).join(',')).join(' ')}" fill="none" stroke="#7ea6e0" stroke-width="3" stroke-dasharray="6 5"/>`;
-  STOPS.forEach((p,i)=>{ const [x,y]=proj(p.lat,p.lng);
-    if(p.radius>0){ const r=Math.max(4,p.radius*s/111320); h+=`<circle cx="${x}" cy="${y}" r="${r}" fill="#1d4ed8" opacity=".08"/>`; }
-    const done=played.has(p.id);
-    h+=`<circle cx="${x}" cy="${y}" r="9" fill="${done?'#a8b6c9':'#1d4ed8'}"/><text x="${x}" y="${y+4}" text-anchor="middle" font-size="10" font-weight="700" fill="#fff">${i+1}</text>`;
-    if(p.mapLabel){ const below=(p.id==='abernessia'); h+=`<text x="${x}" y="${below?y+23:y-13}" text-anchor="middle" font-size="11" fill="#1d2420">${p.mapLabel}</text>`; }
-  });
-  if(lastFix){ const [x,y]=proj(lastFix.lat,lastFix.lng);
-    const inside = x>-20&&x<W+20&&y>-20&&y<H+20;
-    if(inside){ h+=`<circle cx="${x}" cy="${y}" r="14" fill="#2b6cb0" opacity=".2"/><circle cx="${x}" cy="${y}" r="6" fill="#2b6cb0" stroke="#fff" stroke-width="2"/>`; }
-  }
-  svg.innerHTML=h;
-}
-
-
-// two-tap confirm when something is already playing (keyed, survives list redraws)
-let armed=null; // {key,label,until}
-function isArmed(key){ return armed && armed.key===key && Date.now()<armed.until; }
-function confirmTap(key, label, action, refresh){
-  if(isArmed(key)){ armed=null; action(); refresh&&refresh(); return; }
-  armed={key,label,until:Date.now()+3500}; refresh&&refresh();
-  setTimeout(()=>{ if(armed && armed.key===key && Date.now()>=armed.until){ armed=null; refresh&&refresh(); } }, 3600);
-}
-function armBtn(btn,key,label,orig){ if(isArmed(key)){ btn.innerHTML=label; btn.style.background='var(--accent2)'; btn.style.color='#fff'; } else { btn.innerHTML=orig; btn.style.background=''; btn.style.color=''; } }
-// ---------- stop list ----------
-function renderStops(){
-  try{ renderRide(); }catch(e){}
-  const btn=(id)=>`<button data-play="${id}" ${isArmed('play:'+id)?'style="background:var(--accent2)"':''}>${isArmed('play:'+id)?armed.label:'▶'}</button>`;
-  const hide = store.get('cdj_hideplayed', true);
-  const row=(id,badge,name,meta,done)=> (hide && done) ? '' : `<div class="stop" data-id="${id}"><div class="num ${done?'done':''}">${badge}</div><div class="info"><div class="name">${name}</div><div class="meta">${meta}</div></div>${btn(id)}</div>`;
-  const nearMuseum = lastFix && dist(lastFix.lat,lastFix.lng,-22.743852,-45.632977)<500;
-  const moving = lastFix && lastFix.speed!=null && lastFix.speed>4;
-  const tourRows = STOPS.map((p,i)=>{ const d = lastFix ? fmt(dist(lastFix.lat,lastFix.lng,p.lat,p.lng)) : ''; const done=played.has(p.id);
-    const trig = p.radius ? (p.walk? 'plays on arrival (walking)':'plays as you pass') : 'plays when you tap Start';
-    return row(p.id, i+1, p.name, `${d?d+' away · ':''}${done?'played · ':''}${trig}`, done); }).join('');
-  const musRows = MUSEUM.map((m,i)=>row(m.id, String.fromCharCode(65+i), m.name, `${played.has(m.id)?'played · ':''}${m.look.replace('Look for: ','')}`, played.has(m.id))).join('');
-  const walkRows = WALKSTORIES.map(f=>row(f.id,'👣', f.name.replace('Walk: ','').replace(/^./,c=>c.toUpperCase()), played.has(f.id)?'played':'plays while walking, between stops', played.has(f.id))).join('');
-  const roadRows = FILLERS.map(f=>row(f.id,'★', f.name.replace('Story: ','').replace(/^./,c=>c.toUpperCase()), played.has(f.id)?'played':'plays when nothing else is', played.has(f.id))).join('');
-  const cnt=(arr)=>`${arr.filter(x=>played.has(x.id)).length}/${arr.length}`;
-  const open = store.get('cdj_open2', {});
-  const isOpen=(k,auto)=> open[k]!==undefined ? open[k] : auto;
-  const sec=(k,title,arr,rows,auto)=>`<details class="sec" data-sec="${k}" ${isOpen(k,auto)?'open':''}><summary><span>${title}</span><span class="cnt">${cnt(arr)} played</span></summary>${rows || '<div class="status">All played. Long-press a stop to reset it, or turn off Hide played.</div>'}</details>`;
-  // up next: first unplayed eligible tour stop by order
-  const next = STOPS.find(p=>!played.has(p.id) && (!p.after || played.has(p.after)) && (!p.before || !played.has(p.before)));
-  $('stops').innerHTML =
-    (next ? `<div class="upnext"><div class="lbl">Up next</div>${row(next.id,'▸',next.name, (lastFix?fmt(dist(lastFix.lat,lastFix.lng,next.lat,next.lng))+' away · ':'')+(next.radius?(next.walk?'plays on arrival':'plays as you pass'):'tap to play'), false)}</div>` : '') +
-    `<label class="hidep"><input type="checkbox" id="hidePlayed" ${hide?'checked':''}> Hide played (uncheck to replay or reset)</label>` +
-    sec('tour','📍 Tour stops',STOPS,tourRows,false) +
-    sec('museum','🗿 Museum walk',MUSEUM,musRows,nearMuseum) +
-    sec('walk','🚶 Walking stories',WALKSTORIES,walkRows,false) +
-    sec('road','🚗 Road stories',FILLERS,roadRows,false);
-  $('hidePlayed').onchange=()=>{ store.set('cdj_hideplayed',$('hidePlayed').checked); renderStops(); };
-  $('stops').querySelectorAll('details.sec').forEach(d=>d.addEventListener('toggle',()=>{ const o=store.get('cdj_open2',{}); o[d.dataset.sec]=d.open; store.set('cdj_open2',o); }));
-  document.querySelectorAll('[data-play]').forEach(b=>b.onclick=()=>{ if(Date.now()<suppressClickUntil) return; unlockAudio();
-    const id=b.dataset.play;
-    if(current){ confirmTap('play:'+id, current.stop.id===id?'Restart?':'Switch?', ()=>playNow(id), renderStops); return; }
-    playNow(id); });
-}
-$('scripts').innerHTML = STOPS.concat(MUSEUM,WALKSTORIES,FILLERS).map((p,i)=>`<h3 style="margin:14px 0 0;font-size:15px">${i+1}. ${p.name}</h3><div class="script">${p.text}</div>`).join('');
-
-// ---------- speech ----------
-function splitSentences(t){ return t.replace(/\n+/g,' ').match(/[^.!?]+[.!?]+["”]?|[^.!?]+$/g).map(s=>s.trim()).filter(Boolean); }
-function loadVoices(){
-  voices = synth ? synth.getVoices() : [];
-  const en = voices.filter(v=>/^en/i.test(v.lang));
-  const list = en.length?en:voices;
-  const saved = store.get('cdj_voice', null);
-  $('voiceWrap').style.display = list.length>1 ? '' : 'none';
-  $('voice').innerHTML = list.map(v=>`<option value="${v.name}" ${v.name===saved?'selected':''}>${v.name} (${v.lang})${v.localService?' · offline':''}</option>`).join('');
-  if(!saved){ const pref = list.find(v=>v.localService && /en[-_]US/i.test(v.lang)) || list.find(v=>v.localService) || list[0]; if(pref) $('voice').value=pref.name; }
-}
-if(synth){ loadVoices(); synth.onvoiceschanged = loadVoices; }
-$('hoh').checked = store.get('cdj_hoh',false); document.body.classList.toggle('hoh',$('hoh').checked);
-$('hoh').onchange = ()=>{ document.body.classList.toggle('hoh',$('hoh').checked); store.set('cdj_hoh',$('hoh').checked); if($('hoh').checked && synth) synth.cancel(); if(current){ current.token=Math.random(); speakNext(); } };
-$('voice').onchange = ()=>store.set('cdj_voice',$('voice').value);
-$('rate').oninput = ()=>{ $('rateVal').textContent=(+$('rate').value).toFixed(2); store.set('cdj_rate',$('rate').value); };
-$('rate').value = store.get('cdj_rate','1'); $('rateVal').textContent=(+$('rate').value).toFixed(2);
-
-function speakNext(){
-  if(!current || paused) return;
-  if(current.idx >= current.sentences.length){ finishCurrent(); return; }
-  saveState();
-  const item = current.sentences[current.idx];
-  const myTok = current.token;
-  if(typeof item==='object' && item.pause){
-    let n=item.pause; quizUI('count', current.stop.id, n);
-    const tick=()=>{ if(!current||current.token!==myTok||paused) return; n--; if(n<=0){ current.idx++; speakNext(); } else { quizUI('count', current.stop.id, n); qTimer=setTimeout(tick,1000);} };
-    qTimer=setTimeout(tick,1000); return;
-  }
-  let text = item;
-  if(typeof item==='object'){ text=item.t; quizUI(item.quiz, current.stop.id); }
-  const u = new SpeechSynthesisUtterance(text);
-  const v = voices.find(v=>v.name===$('voice').value); if(v){ u.voice=v; u.lang=v.lang; } else u.lang='en-US';
-  u.rate = +$('rate').value;
-  const myToken = current.token;
-  u.onend = ()=>{ if(!current||current.token!==myToken||paused) return; current.idx++; speakNext(); };
-  u.onerror = (e)=>{ if(!current||current.token!==myToken||paused) return; if(e.error==='interrupted'||e.error==='canceled') return; current.idx++; speakNext(); };
-  $('nowLine').textContent = text;
-  if(document.body.classList.contains('hoh')){
-    const ms = Math.max(2200, text.length*70/(+$('rate').value));
-    qTimer = setTimeout(()=>{ if(!current||current.token!==myToken||paused) return; current.idx++; speakNext(); }, ms);
-    return;
-  }
-  synth.speak(u);
-}
-function buildSeq(id, stop){ const seq = splitSentences(stop.text);
-  if(stop.quiz && !QUIZ[id]) QUIZ[id]=stop.quiz;
-  if(QUIZ[id]){ seq.push({quiz:'ask', t:'Quiz time! '+QUIZ[id].ask}); seq.push({pause:8}); seq.push({quiz:'answer', t:'The answer: '+QUIZ[id].ans}); }
-  return seq; }
-function saveState(){ store.set('cdj_state',{ started, paused, queue, cur: current?{id:current.stop.id, idx:current.idx}:null, t:Date.now() }); }
-function startStop(id){
-  const stop = STOPS.find(s=>s.id===id) || FILLERS.find(s=>s.id===id) || MUSEUM.find(s=>s.id===id) || WALKSTORIES.find(s=>s.id===id); if(!stop) return;
-  lastActivity=Date.now();
-  synth && synth.cancel();
-  paused=false;
-  current = { stop, sentences: buildSeq(id, stop), idx:0, token:Math.random() };
-  showScene(id); quizUI('hide'); showLook(id);
-  played.add(id); store.set('cdj_played',[...played]);
-  $('nowTitle').textContent = '🔊 '+stop.name; $('pauseBtn').textContent='Pause';
-  ['pauseBtn','stopBtn','skipBtn'].forEach(b=>$(b).disabled=false);
-  renderStops(); drawMap();
-  if(document.body.classList.contains('hoh') && navigator.vibrate){ try{ navigator.vibrate([200,100,200]); }catch(e){} }
-  if(!synth && !document.body.classList.contains('hoh')){ $('nowLine').textContent='Speech not supported in this browser.'; return; }
-  syncPause();
-  setTimeout(speakNext, 150);
-}
-function finishCurrent(){
-  if(current && current.stop.id==='mosteiro' && !played.has('w_route') && !queue.includes('w_route')) queue.push('w_route');
-  if(current && current.stop.id==='felicia' && !played.has('m_start') && !queue.includes('m_start')) queue.unshift('m_start');
-  lastActivity=Date.now(); current=null; clearTimeout(qTimer); saveState(); $('nowTitle').textContent='Nothing playing'; $('nowLine').textContent='';
-  ['pauseBtn','stopBtn','skipBtn'].forEach(b=>$(b).disabled=true);
-  syncPause();
-  if(queue.length){ const n=queue.shift(); setTimeout(()=>startStop(n),800); }
-}
-function playNow(id){ queue = queue.filter(q=>q!==id); startStop(id); }
-function enqueue(id){
-  if(played.has(id) || queue.includes(id) || (current && current.stop.id===id)) return;
-  if(!current) startStop(id); else queue.push(id);
-}
-function togglePause(){ if(!current) return; unlockAudio();
-  if(!paused){ paused=true; clearTimeout(qTimer); synth && synth.cancel(); $('pauseBtn').textContent='Resume'; }
-  else { paused=false; $('pauseBtn').textContent='Pause'; current.token=Math.random(); speakNext(); }
-  syncPause(); }
-function estSec(it){ if(typeof it==='object'){ if(it.pause) return it.pause; it=it.t; } return Math.max(1.5, (it||'').length*0.065/(+$('rate').value||1)); }
-function rewind(){ if(!current) return;
-  clearTimeout(qTimer); synth && synth.cancel();
-  let i=current.idx, acc=0; // restart current sentence, then step back until ~10s covered
-  while(i>0 && acc<10){ i--; acc+=estSec(current.sentences[i]); }
-  current.idx=i; current.token=Math.random();
-  if(!paused) setTimeout(speakNext,120); else { const it=current.sentences[i]; $('nowLine').textContent=typeof it==='object'?(it.t||''):it; }
-}
-$('rewBtn').onclick=rewind;
-function syncPause(){ const f=$('fabPause'); f.style.display=current?'':'none'; $('fabRew').style.display=current?'':'none'; $('rewBtn').disabled=!current; f.textContent=paused?'▶ Resume':'⏸ Pause'; f.classList.toggle('resume',paused); }
-$('pauseBtn').onclick=togglePause; $('fabPause').onclick=togglePause; $('fabRew').onclick=rewind;
-$('stopBtn').onclick = ()=>confirmTap('stop','Stop?',doStop,()=>armBtn($('stopBtn'),'stop','Stop?','Stop'));
-function doStop(){ queue=[]; synth && synth.cancel(); current=null; paused=false; finishCurrent(); }
-$('skipBtn').onclick = ()=>confirmTap('skip','Skip?',doSkip,()=>armBtn($('skipBtn'),'skip','Skip?','Skip ▸'));
-function doSkip(){ synth && synth.cancel(); current=null; paused=false; finishCurrent(); };
-$('testVoice').onclick = ()=>{ unlockAudio(); synth.cancel(); const u=new SpeechSynthesisUtterance('Bem-vindo! Welcome to Campos do Jordão.'); const v=voices.find(v=>v.name===$('voice').value); if(v){u.voice=v;u.lang=v.lang;} u.rate=+$('rate').value; synth.speak(u); };
-$('resetPlayed').onclick = ()=>{ played=new Set(); store.set('cdj_played',[]); renderStops(); drawMap(); };
-
-let unlocked=false;
-function unlockAudio(){ if(unlocked||!synth) return; const u=new SpeechSynthesisUtterance(' '); u.volume=0; synth.speak(u); unlocked=true; }
-
-// ---------- GPS ----------
-function onFix(pos){
-  const c=pos.coords; prevFix=lastFix;
-  lastFix={lat:c.latitude,lng:c.longitude,acc:c.accuracy,t:pos.timestamp,speed:c.speed};
-  let spd = (c.speed!=null && !isNaN(c.speed)) ? c.speed : null;
-  if(spd===null && prevFix){ const dt=(lastFix.t-prevFix.t)/1000; if(dt>0) spd=dist(prevFix.lat,prevFix.lng,lastFix.lat,lastFix.lng)/dt; }
-  $('gpsInfo').innerHTML = `GPS: <span class="ok">on</span> · accuracy ±${Math.round(c.accuracy)} m${spd!=null?' · '+(spd*3.6).toFixed(0)+' km/h':''}`;
-  if($('auto').checked && c.accuracy<120){
-    for(const p of STOPS){
-      if(!p.radius || played.has(p.id)) continue;
-      if(p.after && !played.has(p.after)) continue;
-      if(p.before && played.has(p.before)) continue;
-      const d=dist(c.latitude,c.longitude,p.lat,p.lng);
-      if(d<=p.radius){
-        if(p.walk && spd!=null && spd>3.5) continue; // still in a car, wait until walking
-        enqueue(p.id);
-      }
-    }
-  }
-  if($('auto').checked && !current && !queue.length && spd!=null && spd>4 && Date.now()-lastActivity>25000){
-    // seconds until we reach the edge of the next stop that could auto-play
-    let eta=Infinity;
-    for(const p of STOPS){ if(!p.radius || played.has(p.id)) continue; if(p.after && !played.has(p.after)) continue; if(p.before && played.has(p.before)) continue;
-      const edge=Math.max(0, dist(c.latitude,c.longitude,p.lat,p.lng)-p.radius); eta=Math.min(eta, edge/spd); }
-    const dur=f=>buildSeq(f.id,f).reduce((a,it)=>a+estSec(it),0);
-    const fits = FILLERS.filter(f=>!played.has(f.id)).map(f=>({f,d:dur(f)})).filter(x=>x.d+20<eta);
-    if(fits.length){ fits.sort((a,b)=>b.d-a.d); startStop(fits[0].f.id); }
-  }
-  if($('auto').checked && !current && !queue.length && spd!=null && spd>0.4 && spd<2.5 && Date.now()-lastActivity>40000 && played.has('felicia')
-     && dist(c.latitude,c.longitude,-22.743852,-45.632977)>500){
-    let eta=Infinity;
-    for(const p of STOPS){ if(!p.radius || played.has(p.id)) continue; if(p.after && !played.has(p.after)) continue; if(p.before && played.has(p.before)) continue;
-      eta=Math.min(eta, Math.max(0, dist(c.latitude,c.longitude,p.lat,p.lng)-p.radius)/spd); }
-    const w = WALKSTORIES.find(f=>!played.has(f.id) && buildSeq(f.id,f).reduce((a,it)=>a+estSec(it),0)+15<eta);
-    if(w) startStop(w.id);
-  }
-  if(c.heading!=null && !isNaN(c.heading) && spd!=null && spd>0.8 && !compassActive()) heading=c.heading;
-  try{ renderWalk(); }catch(e){}
-  renderStops(); drawMap();
-}
-function compassActive(){ return $('compassBtn').textContent==='Compass on'; }
-function onGeoErr(e){ $('gpsInfo').innerHTML = `GPS: <span class="bad">${e.message||'unavailable'}</span>. You can still tap ▶ on any stop.`; }
-
-async function keepAwake(){ try{ if('wakeLock' in navigator){ wakeLock = await navigator.wakeLock.request('screen'); } }catch(e){} }
-document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='visible' && started) keepAwake(); });
-
-let watching=false;
-async function beginTracking(){ await keepAwake(); if(watching) return; watching=true;
-  if('geolocation' in navigator){ navigator.geolocation.watchPosition(onFix,onGeoErr,{enableHighAccuracy:true,maximumAge:5000,timeout:30000}); }
-  else onGeoErr({message:'not supported'}); }
-$('start').onclick = async ()=>{
-  unlockAudio();
-  if(started){ // tour already running (or restored after refresh): never auto-replay the intro
-    await beginTracking();
-    if(current && paused) togglePause();
-    $('status').innerHTML='<span class="ok">Tour running.</span> To hear the intro again, tap ▶ on stop 1.';
-    return;
-  }
-  started=true;
-  $('start').textContent='Tour running'; $('start').classList.add('secondary');
-  await beginTracking();
-  const sw = navigator.serviceWorker && navigator.serviceWorker.controller;
-  $('status').innerHTML = `${sw?'<span class="ok">Saved for offline use.</span>':'Offline copy is being saved; reload once while online to be sure.'} Screen will stay on while this page is open.`;
-  playNow('drive1'); saveState();
-};
-
-// ---------- offline ----------
-if('serviceWorker' in navigator){
-  navigator.serviceWorker.register('sw.js').then(()=>{
-    if(!started) $('status').innerHTML = (navigator.serviceWorker.controller?'<span class="ok">Saved for offline use.</span> ':'Saving offline copy… ') + 'Tap Start when you leave the hotel.';
-  }).catch(()=>{});
-}
-
-
-
-// ---------- walking guide ----------
-const WALK = [
-  {id:"mosteiro", name:"Mosteiro de São João", lat:-22.7362131, lng:-45.5958014},
-  {id:"teresinha", name:"Igreja Santa Teresinha", lat:-22.7399843, lng:-45.5917832},
-  {id:"mercado", name:"Mercado Municipal", lat:-22.7385814, lng:-45.5927793},
-  {id:"estacao", name:"Estação Abernéssia", lat:-22.7382467, lng:-45.5919284},
-  {id:"cezas", name:"Ceza's Restaurante", lat:-22.7338056, lng:-45.5860889},
-  {id:"joao", name:"Restaurante do João", lat:-22.7400725, lng:-45.5925829},
-  {id:"terra", name:"Terra Brasil Restaurante", lat:-22.7374672, lng:-45.5915418},
-  {id:"museum", name:"Museu Felícia Leirner entrance", lat:-22.743852, lng:-45.632977},
-  {id:"hotel", name:"Hotel Le Renard", lat:-22.7194257, lng:-45.5611975}
-];
-let walkSel = store.get('cdj_walk','auto'), heading=null;
-$('walkSel').innerHTML = '<option value="auto">Automatic (nearest next stop)</option>' + WALK.map(w=>`<option value="${w.id}">${w.name}</option>`).join('');
-$('walkSel').value = walkSel;
-$('walkSel').onchange = ()=>{ walkSel=$('walkSel').value; store.set('cdj_walk',walkSel); renderWalk(); };
-function bearing(a,b,c,d){ const t=Math.PI/180, y=Math.sin((d-b)*t)*Math.cos(c*t), x=Math.cos(a*t)*Math.sin(c*t)-Math.sin(a*t)*Math.cos(c*t)*Math.cos((d-b)*t); return (Math.atan2(y,x)/t+360)%360; }
-const DIRS=['north','northeast','east','southeast','south','southwest','west','northwest'];
-function walkTarget(){
-  if(walkSel!=='auto') return WALK.find(w=>w.id===walkSel);
-  if(!lastFix) return null;
-  const cands = WALK.filter(w=>{ const s=STOPS.find(x=>x.id===w.id); return !s || !played.has(s.id); }).filter(w=>!['hotel','museum'].includes(w.id));
-  let best=null,bd=1e9; for(const w of cands){ const d=dist(lastFix.lat,lastFix.lng,w.lat,w.lng); if(d<bd){bd=d;best=w;} }
-  return bd<2500?best:null;
-}
-function renderWalk(){
-  const w=walkTarget();
-  if(!w || !lastFix){ $('walkTo').textContent = w? w.name : 'nothing nearby'; $('walkDist').textContent=''; $('walkHint').textContent = lastFix? 'No walking stop within 2.5 km. Pick a destination below.' : 'Waiting for GPS…'; $('walkNote').textContent=''; return; }
-  const d=dist(lastFix.lat,lastFix.lng,w.lat,w.lng), b=bearing(lastFix.lat,lastFix.lng,w.lat,w.lng);
-  $('walkTo').textContent=w.name; $('walkDist').textContent='· '+fmt(d);
-  const mins=Math.max(1,Math.round(d/75));
-  if(d<40){ $('walkHint').textContent='📍 You are here!'; $('arrowG').style.transform='rotate(0deg)'; }
-  else if(heading!=null){ const rel=((b-heading)+360)%360; $('arrowG').style.transform=`rotate(${rel}deg)`; $('walkHint').textContent = rel<25||rel>335 ? 'Straight ahead' : rel<180 ? (rel<70?'Bear right':'Turn right') : (rel>290?'Bear left':'Turn left'); }
-  else { $('arrowG').style.transform=`rotate(${b}deg)`; $('walkHint').textContent='Head '+DIRS[Math.round(b/45)%8]+' (arrow points north-up)'; }
-  $('walkNote').textContent=`About ${mins} min on foot, as the crow flies. Streets may wind; use Walking directions with signal.`;
-  $('walkMaps').href=`https://www.google.com/maps/dir/?api=1&destination=${w.lat},${w.lng}&travelmode=walking`;
-}
-function onOrient(e){ let hd=null; if(e.webkitCompassHeading!=null) hd=e.webkitCompassHeading; else if(e.absolute && e.alpha!=null) hd=(360-e.alpha)%360; if(hd!=null){ heading=hd; renderWalk(); } }
-$('compassBtn').onclick=async()=>{
-  try{ if(window.DeviceOrientationEvent && typeof DeviceOrientationEvent.requestPermission==='function'){ const r=await DeviceOrientationEvent.requestPermission(); if(r!=='granted') throw 0; }
-    window.addEventListener('deviceorientationabsolute', onOrient, true); window.addEventListener('deviceorientation', onOrient, true);
-    $('compassBtn').textContent='Compass on'; }catch(e){ $('compassBtn').textContent='Compass unavailable'; }
-};
-
-// ---------- rides ----------
-const DEST = {
-  hotel:{name:"Hotel Le Renard", note:"Back to the hotel", lat:-22.7194257, lng:-45.5611975},
-  museum:{name:"Museu Felícia Leirner", note:"Up in Alto da Boa Vista · open Tue to Sun, 9h to 18h", lat:-22.743852, lng:-45.632977, remote:true},
-  palacio:{name:"Palácio Boa Vista", note:"Closed Mon and Tue · free tours Wed to Sun 10h to 12h, 14h to 17h", lat:-22.7359333, lng:-45.6127636},
-  mosteiro:{name:"Mosteiro de São João (Abernéssia)", note:"Shop: 9h30 to 11h45, 13h30 to 14h45, 15h30 to 17h20", lat:-22.7362131, lng:-45.5958014},
-  cezas:{name:"Ceza's Restaurante", note:"Lunch · pay-by-weight buffet · 11h to 15h30", lat:-22.7338056, lng:-45.5860889},
-  joao:{name:"Restaurante do João", note:"Lunch · grilled plates · 8h to 16h", lat:-22.7400725, lng:-45.5925829},
-  terra:{name:"Terra Brasil Restaurante", note:"Lunch · prato feito · 9h30 to 16h", lat:-22.7374672, lng:-45.5915418}
-};
-const uberUrl=d=>`https://m.uber.com/ul/?action=setPickup&pickup=my_location&dropoff[latitude]=${d.lat}&dropoff[longitude]=${d.lng}&dropoff[nickname]=${encodeURIComponent(d.name)}`;
-const mapsUrl=d=>`https://www.google.com/maps/dir/?api=1&destination=${d.lat},${d.lng}&travelmode=driving`;
-
-const PT_ASK = "Você pode voltar para nos buscar às ___? Podemos combinar pelo WhatsApp?";
-const WARN_GO = d => `<b>⚠️ Return rides may be hard to get.</b> ${d.name} is on the outskirts, and Uber pickups there aren't guaranteed, especially on weekdays. Before you leave the car:<br>• Ask your driver to come back at a set time and swap WhatsApp numbers:<br><span class="pt">"${PT_ASK}"</span> (Can you come back to pick us up at ___? Can we arrange it on WhatsApp?)<br>• Or schedule the return with Uber Reserve, if the app offers it (needs about 2 hours' notice).<br>• Backup: the 99 app, or call Le Renard's front desk, <a href="tel:+551236692220">(12) 3669-2220</a>, to send a taxi. A phone call needs only regular cell signal, not data.`;
-const WARN_HERE = `<b>⚠️ You're at a spot where pickups can be slow.</b> Request your ride about 15 minutes before you want to leave, and check you have signal. If no car accepts, try the 99 app or call Le Renard, <a href="tel:+551236692220">(12) 3669-2220</a>, for a taxi. A phone call needs only regular cell signal, not data.`;
-function rideWarning(k){
-  const d=DEST[k];
-  if(d.remote) return WARN_GO(d);
-  const atRemote = lastFix && Object.values(DEST).some(v=>v.remote && dist(lastFix.lat,lastFix.lng,v.lat,v.lng)<700);
-  if(atRemote || (played.has('felicia') && !played.has('palacio') && k==='mosteiro')) return WARN_HERE;
-  return '';
-}
-
-function nextRide(){
-  const o=store.get('cdj_ride','auto'); if(o!=='auto' && DEST[o]) return o;
-  if(!played.has('felicia')) return 'museum';
-  if(!played.has('mosteiro')) return 'mosteiro';
-  return 'hotel';
-}
-function renderRide(){
-  if(!$('rideSel').options.length){ $('rideSel').innerHTML='<option value="auto">Automatic (follow the tour)</option>'+Object.entries(DEST).map(([k,v])=>`<option value="${k}">${v.name}</option>`).join(''); $('rideSel').value=store.get('cdj_ride','auto'); $('rideSel').onchange=()=>{ store.set('cdj_ride',$('rideSel').value); renderRide(); }; }
-  const k=nextRide(), d=DEST[k];
-  $('rideTo').textContent = d.name;
-  const away = lastFix ? ' · '+fmt(dist(lastFix.lat,lastFix.lng,d.lat,d.lng))+' away' : '';
-  $('rideNote').textContent = d.note + away;
-  $('rideUber').href=uberUrl(d); $('rideMaps').href=mapsUrl(d);
-  const w=rideWarning(k); $('rideWarn').style.display=w?'block':'none'; $('rideWarn').innerHTML=w; $('rideFlag').textContent=w?' ⚠️':'';
-  $('rideList').innerHTML = Object.entries(DEST).filter(([kk])=>kk!==k).map(([kk,v])=>`<div class="dest"><div class="n">${v.name}<div class="m">${v.note}</div></div>${v.remote?'<span title="Return rides may be hard" style="margin-right:4px">⚠️</span>':''}<a class="mini" href="${uberUrl(v)}">Uber</a><a class="mini sec" href="${mapsUrl(v)}">Maps</a></div>`).join('');
-}
-
-
-// ---------- google map ----------
-(function(){
-  const H='-22.7194257,-45.5611975', M='-22.743852,-45.632977', MO='-22.7362131,-45.5958014';
-  $('gmap').src = `https://maps.google.com/maps?saddr=${H}&daddr=${M}+to:${MO}+to:${H}&output=embed`;
-  $('gOpen').href = `https://www.google.com/maps/dir/?api=1&origin=${H}&destination=${H}&waypoints=${encodeURIComponent(M+'|'+MO)}&travelmode=driving`;
-  function show(g){ $('gwrap').style.display=g?'':'none'; $('map').style.display=g?'none':''; $('tabG').classList.toggle('on',g); $('tabL').classList.toggle('on',!g); store.set('cdj_maptab',g?'g':'l'); }
-  $('tabG').onclick=()=>show(true); $('tabL').onclick=()=>show(false);
-  const pref=store.get('cdj_maptab', navigator.onLine?'g':'l');
-  show(navigator.onLine && pref==='g');
-  window.addEventListener('offline',()=>show(false));
-  if(!navigator.onLine) $('gNote').textContent='Google map needs signal. Showing the offline map.';
+// Loader: pick the tour, apply any changed plan, then start the app.
+(async function(){
+  const SBU='https://otlbfbqdwygrkxtvgfyp.supabase.co', KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im90bGJmYnFkd3lncmt4dHZnZnlwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE3MDI0MTksImV4cCI6MjA5NzI3ODQxOX0.9D-bMdK6At0CQijs27z0IT8-lpUEu6I4bZrdPko6PQU';
+  const get=(k,d)=>{ try{ const v=localStorage.getItem(k); return v===null?d:JSON.parse(v); }catch(e){ return d; } };
+  const set=(k,v)=>{ try{ localStorage.setItem(k,JSON.stringify(v)); }catch(e){} };
+  const rest=async(path)=>{ if(!navigator.onLine) return null; const c=new AbortController(); const t=setTimeout(()=>c.abort(),4000);
+    try{ const r=await fetch(SBU+'/rest/v1/'+path,{headers:{apikey:KEY,Authorization:'Bearer '+KEY},cache:'no-store',signal:c.signal}); const j=await r.json(); return Array.isArray(j)?j:null; }catch(e){ return null; } finally{ clearTimeout(t); } };
+  const params=new URLSearchParams(location.search);
+  let id=params.get('tour') || get('rhrn_tour','campos-do-jordao');
+  let T=(window.TOUR_DEFS||{})[id];
+  if(!T){ T=get('rhrn_tourdata_'+id,null);
+    const rows=await rest('rhrn_tours?id=eq.'+encodeURIComponent(id)+'&select=data');
+    if(rows && rows[0] && rows[0].data){ T=rows[0].data; set('rhrn_tourdata_'+id,T); } }
+  if(!T || !Array.isArray(T.stops) || !T.stops.length){ id='campos-do-jordao'; T=window.TOUR_DEFS[id]; }
+  T.id=id; set('rhrn_tour',id);
+  if(params.get('tour')!==id) history.replaceState(null,'',location.pathname+'?tour='+encodeURIComponent(id));
+  const SKp=T.storePrefix||('rhrn_'+id+'_');
+  window.TOUR_ORIGINAL_STOPS=T.stops.slice();
+  let plan=get(SKp+'plan',null);
+  const pend=get(SKp+'planPending',null);
+  if(!pend){ const rows=await rest('rhrn_tour_plans?tour_id=eq.'+encodeURIComponent(id)+'&select=v,plan');
+    if(rows && rows[0] && rows[0].v>(plan?plan.v:0)){ plan=rows[0].plan; set(SKp+'plan',plan); } }
+  if(plan && Array.isArray(plan.stops) && plan.stops.length){ T.stops=plan.stops; window.TOUR_PLAN_EDITED=true; }
+  window.TOUR=T;
+  const load=src=>new Promise((res,rej)=>{ const s=document.createElement('script'); s.src=src; s.onload=res; s.onerror=rej; document.body.appendChild(s); });
+  await load('app.js'); await load('plan.js');
 })();
-
-// ---------- photo album ----------
-const SB='https://otlbfbqdwygrkxtvgfyp.supabase.co', SBK='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im90bGJmYnFkd3lncmt4dHZnZnlwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE3MDI0MTksImV4cCI6MjA5NzI3ODQxOX0.9D-bMdK6At0CQijs27z0IT8-lpUEu6I4bZrdPko6PQU';
-const BUCKET='tour-photos', ALBUM='campos-do-jordao';
-let dbp=null;
-function idb(){ if(dbp) return dbp; dbp=new Promise((res,rej)=>{ try{ const r=indexedDB.open('cdj-photos',1); r.onupgradeneeded=()=>r.result.createObjectStore('q',{keyPath:'path'}); r.onsuccess=()=>res(r.result); r.onerror=()=>rej(r.error);}catch(e){rej(e);} }); return dbp; }
-async function qAll(){ try{ const d=await idb(); return await new Promise(r=>{ const t=d.transaction('q').objectStore('q').getAll(); t.onsuccess=()=>r(t.result||[]); t.onerror=()=>r([]); }); }catch(e){ return []; } }
-async function qPut(o){ const d=await idb(); return new Promise((r,j)=>{ const t=d.transaction('q','readwrite'); t.objectStore('q').put(o); t.oncomplete=r; t.onerror=()=>j(t.error); }); }
-async function qDel(k){ const d=await idb(); return new Promise(r=>{ const t=d.transaction('q','readwrite'); t.objectStore('q').delete(k); t.oncomplete=r; t.onerror=r; }); }
-const slug=s=>(s||'guest').normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-zA-Z0-9]+/g,'-').replace(/^-|-$/g,'').slice(0,24)||'guest';
-async function shrink(file){
-  try{ const bmp=await createImageBitmap(file); const k=Math.min(1,1600/Math.max(bmp.width,bmp.height));
-    const c=document.createElement('canvas'); c.width=Math.round(bmp.width*k); c.height=Math.round(bmp.height*k); c.getContext('2d').drawImage(bmp,0,0,c.width,c.height);
-    return await new Promise(r=>c.toBlob(b=>r(b||file),'image/jpeg',0.82)); }catch(e){ return file; }
-}
-function nearestStop(){ if(!lastFix) return current?current.stop.id:'tour'; let best='tour',bd=1e9; for(const p of STOPS){ const d=dist(lastFix.lat,lastFix.lng,p.lat,p.lng); if(d<bd){bd=d;best=p.id;} } return bd<800?best:'tour'; }
-let review=[];
-async function addFiles(files){
-  if(!files.length) return;
-  $('addSheet').classList.remove('open');
-  $('reviewGrid').innerHTML='<div class="status">Preparing…</div>'; $('reviewSheet').classList.add('open');
-  review=[]; for(const f of files){ const blob=await shrink(f); review.push({blob, url:URL.createObjectURL(blob), keep:true}); }
-  renderReview();
-}
-function renderReview(){
-  $('reviewGrid').innerHTML = review.map((r,i)=>`<div data-i="${i}" class="${r.keep?'':'off'}"><img src="${r.url}"><span class="x">${r.keep?'✕':'↺'}</span></div>`).join('');
-  $('reviewGrid').querySelectorAll('[data-i]').forEach(d=>d.onclick=()=>{ const r=review[+d.dataset.i]; r.keep=!r.keep; renderReview(); });
-  const n=review.filter(r=>r.keep).length; $('acceptBtn').textContent = n? `Upload ${n} photo${n===1?'':'s'}` : 'Nothing selected'; $('acceptBtn').disabled=!n;
-}
-$('rejectBtn').onclick=()=>{ review.forEach(r=>URL.revokeObjectURL(r.url)); review=[]; $('reviewSheet').classList.remove('open'); };
-$('acceptBtn').onclick=async()=>{ const keep=review.filter(r=>r.keep).map(r=>r.blob); review.forEach(r=>URL.revokeObjectURL(r.url)); review=[]; $('reviewSheet').classList.remove('open'); $('addSheet').classList.add('open'); await queueBlobs(keep); };
-async function queueBlobs(blobs){
-  const who=slug($('who').value); store.set('cdj_who',$('who').value);
-  let n=0;
-  for(const blob of blobs){ const stop=current?current.stop.id:nearestStop();
-    const path=`${ALBUM}/${Date.now()}-${Math.random().toString(36).slice(2,6)}__${who}__${stop}.jpg`;
-    try{ await qPut({path, blob, t:Date.now()}); n++; }catch(e){ $('upStatus').textContent='Could not save photo on this phone: '+e; } }
-  $('upStatus').innerHTML=`<span class="ok">${n} photo${n===1?'':'s'} saved.</span> Uploading…`; updateBadge(); flush();
-document.querySelectorAll('[data-close]').forEach(b=>b.onclick=()=>$(b.dataset.close).classList.remove('open'));
-}
-let flushing=false;
-async function flush(){
-  if(flushing) return; flushing=true;
-  try{ const items=await qAll();
-    for(const it of items){ if(!navigator.onLine) break;
-      try{ const r=await fetch(`${SB}/storage/v1/object/${BUCKET}/${it.path}`,{method:'POST',headers:{apikey:SBK,Authorization:'Bearer '+SBK,'Content-Type':'image/jpeg'},body:it.blob});
-        if(r.ok || r.status===409){ await qDel(it.path); } else { $('upStatus').textContent='Upload paused (server said '+r.status+'). Will retry.'; break; } }catch(e){ break; } }
-  }finally{ flushing=false; }
-  const left=(await qAll()).length; updateBadge();
-  if(left===0) $('upStatus').innerHTML='<span class="ok">All photos uploaded to the album.</span>'; else $('upStatus').textContent=`${left} waiting for signal. They'll upload automatically.`;
-}
-async function updateBadge(){ const n=(await qAll()).length; $('badge').style.display=n?'block':'none'; $('badge').textContent=n; }
-window.addEventListener('online',flush); setInterval(flush,30000);
-const nice=id=>{ const s=STOPS.find(x=>x.id===id)||FILLERS.find(x=>x.id===id); return s? s.name.replace(/\s*\(.*\)/,'') : 'On the road'; };
-async function openAlbum(){
-  $('albumSheet').classList.add('open'); $('albumStatus').textContent='Loading…';
-  const local=await qAll(); let tiles=local.map(it=>({src:URL.createObjectURL(it.blob), name:it.path.split('/').pop(), pend:true, path:it.path}));
-  try{ const r=await fetch(`${SB}/storage/v1/object/list/${BUCKET}`,{method:'POST',headers:{apikey:SBK,Authorization:'Bearer '+SBK,'Content-Type':'application/json'},body:JSON.stringify({prefix:ALBUM,limit:500,sortBy:{column:'name',order:'desc'}})});
-    const j=await r.json(); if(Array.isArray(j)){ tiles=tiles.concat(j.filter(o=>o.name&&o.name.endsWith('.jpg')).map(o=>({src:`${SB}/storage/v1/object/public/${BUCKET}/${ALBUM}/${o.name}`, name:o.name, path:`${ALBUM}/${o.name}`}))); }
-    $('albumStatus').textContent = tiles.length? `${tiles.length} photo${tiles.length===1?'':'s'} from the group`:'No photos yet. Tap 📷 to add the first!';
-  }catch(e){ $('albumStatus').textContent = (tiles.length?'Showing photos on this phone. ':'')+'Offline: the shared album loads when you have signal.'; }
-  $('grid').innerHTML = tiles.map(t=>{ const parts=t.name.replace('.jpg','').split('__'); const who=(parts[1]||'').replace(/-/g,' '); return `<div><img loading="lazy" crossorigin="anonymous" src="${t.src}" data-full="${t.src}" data-path="${t.path}" data-pend="${t.pend?1:0}">${t.pend?'<span class="pend">waiting</span>':''}<span class="tag">${who} · ${nice(parts[2])}</span></div>`; }).join('');
-  $('grid').querySelectorAll('img').forEach(i=>i.onclick=()=>{ $('viewImg').src=i.dataset.full; viewPath=i.dataset.path; viewPend=i.dataset.pend==='1'; $('vDel').textContent='🗑 Delete'; delArmed=false; $('vDel').style.display=(ownerPin()||viewPend)?'':'none'; $('viewer').classList.add('open'); });
-}
-
-
-// ---------- owner moderation ----------
-let viewPath=null, viewPend=false, delArmed=false;
-const ownerPin=()=>store.get('cdj_owner_pin','');
-function ownerUI(){ $('ownerBtn').textContent = ownerPin()? '🔓 Owner (on)' : '🔒 Owner'; }
-async function adminCall(pin, path){ const r=await fetch(`${SB}/functions/v1/album-admin`,{method:'POST',headers:{apikey:SBK,Authorization:'Bearer '+SBK,'Content-Type':'application/json'},body:JSON.stringify({pin,path})}); return r; }
-$('ownerBtn').onclick=()=>{ if(ownerPin()){ store.set('cdj_owner_pin',''); ownerUI(); $('ownerBox').style.display='none'; return; } $('ownerBox').style.display=$('ownerBox').style.display==='none'?'block':'none'; };
-$('ownerGo').onclick=async()=>{ const pin=$('ownerPin').value.trim(); if(!pin) return; $('ownerMsg').textContent='Checking…';
-  try{ const r=await adminCall(pin,'__check'); if(r.ok){ store.set('cdj_owner_pin',pin); $('ownerMsg').innerHTML='<span class="ok">Owner mode on.</span> Open any album photo to delete it.'; $('ownerPin').value=''; ownerUI(); }
-    else $('ownerMsg').innerHTML='<span class="bad">Wrong PIN.</span>'; }catch(e){ $('ownerMsg').textContent='Needs signal to check the PIN.'; } };
-$('vDel').onclick=async e=>{ e.stopPropagation();
-  if(!delArmed){ delArmed=true; $('vDel').textContent='Tap again to delete'; return; }
-  $('vMsg').textContent='Deleting…';
-  try{
-    if(viewPend){ await qDel(viewPath); updateBadge(); }
-    else { const r=await adminCall(ownerPin(), viewPath); if(r.status===401){ store.set('cdj_owner_pin',''); ownerUI(); throw new Error('PIN no longer valid'); } if(!r.ok) throw new Error('server '+r.status); }
-    $('viewer').classList.remove('open'); $('vMsg').textContent=''; openAlbum();
-  }catch(err){ $('vMsg').textContent='Could not delete: '+err.message; delArmed=false; $('vDel').textContent='🗑 Delete'; }
-};
-ownerUI();
-
-
-// ---------- ask your guide ----------
-function nearestStopInfo(){
-  if(!lastFix) return null; let best=null,bd=1e9;
-  for(const p of STOPS){ const d=dist(lastFix.lat,lastFix.lng,p.lat,p.lng); if(d<bd){bd=d;best=p;} }
-  return best?{stop:best,d:bd}:null;
-}
-function localAnswer(q){
-  const norm=s=>s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'');
-  const stop=new Set(['what','where','when','which','with','that','this','there','about','tell','from','have','does','they','their','here','were','would','could','should','long','many','much','some']);
-  const syn={statue:'sculpt',statues:'sculpt',sculptures:'sculpt',sculpture:'sculpt',church:'igreja',train:'railway',food:'eat',snack:'eat'};
-  const words=[...new Set(norm(q).split(/[^a-z0-9]+/).filter(w=>w.length>3 && !stop.has(w)).map(w=>syn[w]||w))];
-  if(!words.length) return '';
-  const n=nearestStopInfo(); const pool=STOPS.concat(MUSEUM,WALKSTORIES,FILLERS);
-  const sens=[]; for(const s of pool) for(const sen of splitSentences(s.text)) sens.push({id:s.id,sen,t:norm(sen)});
-  const stem=w=>w.slice(0,Math.max(4,w.length-2)); const df={}; for(const w of words) df[w]=sens.filter(x=>x.t.includes(stem(w))).length||1;
-  const scored=sens.map(x=>{ let sc=0, hit=0; for(const w of words){ if(x.t.includes(stem(w))){ sc+=Math.min(9,1/df[w]); hit++; } } sc+=hit*10;
-    if(sc && n && x.id===n.stop.id) sc*=1.4; if(sc && current && x.id===current.stop.id) sc*=1.4; return {sc,x}; }).filter(o=>o.sc>0);
-  const need=Math.max(1,Math.ceil(words.length*0.5));
-  scored.sort((a,b)=>b.sc-a.sc); if(!scored.length || Math.floor(scored[0].sc/10)<need) return '';
-  const top=scored[0].x; const same=scored.filter(o=>o.x.id===top.id).slice(0,3).map(o=>o.x.sen);
-  return same.join(' ');
-}
-function sayAnswer(text){
-  if(!text) return;
-  if(current && !paused) togglePause();
-  if(document.body.classList.contains('hoh') || !synth) return;
-  synth.cancel(); const u=new SpeechSynthesisUtterance(text); const v=voices.find(v=>v.name===$('voice').value); if(v){u.voice=v;u.lang=v.lang;} u.rate=+$('rate').value; synth.speak(u);
-}
-let askHist=[]; try{ askHist=JSON.parse(sessionStorage.getItem('cdj_askhist')||'[]'); }catch(e){}
-function tourOverview(){
-  const first=t=>splitSentences(t).slice(0,2).join(' ').slice(0,280);
-  const line=(p,kind)=>`- ${p.name}${kind?' ['+kind+']':''}${played.has(p.id)?' (already heard)':''}: ${first(p.text)}`;
-  return STOPS.map(p=>line(p,'stop')).concat(MUSEUM.map(p=>line(p,'museum walk')), WALKSTORIES.map(p=>line(p,'walking story')), FILLERS.map(p=>line(p,'road story'))).join('\n');
-}
-const TRIP="Guests are staying at Hotel Le Renard in Capivari, Campos do Jordão (Av. Macedo Soares area). The tour's first stop, 'Drive up to Alto da Boa Vista', starts at the hotel, so being near it means being at the hotel. Today's tour: Uber up to the Felícia Leirner outdoor sculpture museum and Auditório Claudio Santoro in Alto da Boa Vista, past the Palácio Boa Vista, then down to Abernéssia and the Benedictine Mosteiro de São João, then back to the hotel.";
-function askContext(){
-  const n=nearestStopInfo();
-  return { lat:lastFix?lastFix.lat:null, lng:lastFix?lastFix.lng:null, near:n?n.stop.name:'', nearDist:n?fmt(n.d):'',
-    playing: current?current.stop.name:'', local:new Date().toLocaleString('en-US',{timeZone:'America/Sao_Paulo',weekday:'short',hour:'2-digit',minute:'2-digit'}),
-    script: (current?current.stop.text:'') + '\n' + (n && n.d<1500 ? n.stop.text : ''),
-    trip: TRIP, overview: tourOverview(), history: askHist.slice(-4) };
-}
-async function ask(){
-  const q=$('askIn').value.trim(); if(!q) return;
-  $('askAns').textContent='Thinking…'; $('askSay').style.display='none';
-  let ans='', src='', errMsg='';
-  if(navigator.onLine){
-    try{ const r=await fetch(`${SB}/functions/v1/tour-ask`,{method:'POST',headers:{apikey:SBK,Authorization:'Bearer '+SBK,'Content-Type':'application/json'},body:JSON.stringify(Object.assign({question:q},askContext()))});
-      const j=await r.json(); if(r.ok && j.answer){ ans=j.answer; src='Claude'; } else if(j.error==='not_configured'){ src='notcfg'; } else { src='err'; errMsg=(j.detail||j.error||('HTTP '+r.status)); } }catch(e){ src='err'; errMsg=String(e); }
-  }
-  if(!ans){ ans=localAnswer(q); if(ans) ans=(src==='notcfg'?'':'')+ans; }
-  if(!ans) ans = navigator.onLine ? "That one isn't covered in my tour notes, and I can't reach Claude right now. Try asking museum staff, or rephrase the question." : "I can't reach Claude without signal, and I didn't find that in the tour notes. Try again when you have signal.";
-  $('askAns').innerHTML = ans.replace(/</g,'&lt;') + `<div class="status" style="margin-top:8px">${src==='Claude'?'Answered by Claude using your location.':'From the tour notes on this phone (offline answer).'}${src==='notcfg'?' Claude answers need setup: see the owner note.':''}${src==='err'?' (Claude unavailable: '+errMsg.replace(/</g,'&lt;').slice(0,120)+')':''}</div>`;
-  if(src==='Claude'){ askHist.push({q, a:ans}); askHist=askHist.slice(-6); try{ sessionStorage.setItem('cdj_askhist',JSON.stringify(askHist)); }catch(e){} }
-  $('askSay').style.display=''; $('askSay').onclick=()=>sayAnswer(ans);
-  sayAnswer(ans);
-}
-$('askGo').onclick=()=>{ unlockAudio(); ask(); };
-$('askBtn').onclick=()=>{ const n=nearestStopInfo();
-  $('askWhere').textContent = n? `Near: ${n.stop.name} (${fmt(n.d)})${current?' · playing: '+current.stop.name:''}` : 'Location unknown. Tap Start tour to turn on GPS.';
-  const chips=['What am I looking at?','Where can we get a light snack nearby?','Tell me a fun fact about this place','How long should we spend here?'];
-  $('askChips').innerHTML=chips.map(c=>`<button>${c}</button>`).join(''); $('askChips').querySelectorAll('button').forEach(b=>b.onclick=()=>{ $('askIn').value=b.textContent; unlockAudio(); ask(); });
-  $('askSheet').classList.add('open'); };
-$('micBtn').onclick=()=>{
-  const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
-  if(!SR){ $('askAns').textContent='Voice input is not supported in this browser. Type instead, or use your keyboard\'s microphone.'; return; }
-  const r=new SR(); r.lang='en-US'; r.interimResults=true; $('micBtn').textContent='🎙 Listening…';
-  r.onresult=e=>{ $('askIn').value=[...e.results].map(x=>x[0].transcript).join(''); };
-  r.onend=()=>{ $('micBtn').textContent='🎤 Speak'; if($('askIn').value.trim()) ask(); };
-  r.onerror=()=>{ $('micBtn').textContent='🎤 Speak'; };
-  if(current && !paused) togglePause();
-  r.start();
-};
-
-
-// ---------- long press a stop to reset it ----------
-let suppressClickUntil=0, lp=null;
-function toast(msg){ const t=$('toast'); t.textContent=msg; t.style.display='block'; clearTimeout(t._h); t._h=setTimeout(()=>t.style.display='none',2600); }
-$('stops').addEventListener('pointerdown', e=>{
-  const row=e.target.closest('.stop[data-id]'); if(!row) return;
-  const id=row.dataset.id; row.classList.add('pressing');
-  lp={id, x:e.clientX, y:e.clientY, t:setTimeout(()=>{
-    lp=null; suppressClickUntil=Date.now()+700;
-    played.delete(id); store.set('cdj_played',[...played]); queue=queue.filter(q=>q!==id); saveState();
-    if(navigator.vibrate){ try{ navigator.vibrate(60); }catch(err){} }
-    const s=STOPS.find(x=>x.id===id)||MUSEUM.find(x=>x.id===id)||WALKSTORIES.find(x=>x.id===id)||FILLERS.find(x=>x.id===id);
-    toast(`↺ Reset: "${s?s.name:id}" will play again`); renderStops(); drawMap();
-  }, 650)};
-});
-function lpCancel(e){ if(!lp) { document.querySelectorAll('.stop.pressing').forEach(r=>r.classList.remove('pressing')); return; }
-  if(e && e.type==='pointermove' && Math.hypot(e.clientX-lp.x,e.clientY-lp.y)<10) return;
-  clearTimeout(lp.t); lp=null; document.querySelectorAll('.stop.pressing').forEach(r=>r.classList.remove('pressing')); }
-['pointerup','pointercancel','pointermove'].forEach(ev=>document.addEventListener(ev,lpCancel,{passive:true}));
-$('stops').addEventListener('contextmenu', e=>e.preventDefault());
-
-// ---------- branded share ----------
-const PIN = new Path2D('M120 186 C 92 146, 64 120, 64 88 A 56 56 0 0 1 176 88 C 176 120, 148 146, 120 186 Z');
-async function brandedBlob(src){
-  const img = await new Promise((res,rej)=>{ const i=new Image(); i.crossOrigin='anonymous'; i.onload=()=>res(i); i.onerror=rej; i.src=src; });
-  const c=document.createElement('canvas'); c.width=img.naturalWidth; c.height=img.naturalHeight; const x=c.getContext('2d');
-  x.drawImage(img,0,0);
-  const u=Math.max(c.width,c.height)/1000; // scale unit
-  const f1=Math.round(26*u), f2=Math.round(17*u), pad=Math.round(16*u);
-  x.font=`700 ${f1}px -apple-system,Segoe UI,Roboto,sans-serif`; const t1='Campos do Jordão';
-  x.font=`600 ${f2}px -apple-system,Segoe UI,Roboto,sans-serif`; const t2='Right Here, Right Now';
-  x.font=`700 ${f1}px -apple-system,Segoe UI,Roboto,sans-serif`; const w1=x.measureText(t1).width;
-  x.font=`600 ${f2}px -apple-system,Segoe UI,Roboto,sans-serif`; const w2=x.measureText(t2).width;
-  const iconW=Math.round(34*u), bw=pad*3+iconW+Math.max(w1,w2), bh=pad*2+f1+f2+Math.round(4*u);
-  const bx=Math.round(22*u), by=c.height-bh-Math.round(22*u), r=bh/2;
-  x.fillStyle='rgba(11,42,91,.72)'; x.beginPath(); x.moveTo(bx+r,by); x.arcTo(bx+bw,by,bx+bw,by+bh,r); x.arcTo(bx+bw,by+bh,bx,by+bh,r); x.arcTo(bx,by+bh,bx,by,r); x.arcTo(bx,by,bx+bw,by,r); x.fill();
-  x.save(); const sc=iconW/120; x.translate(bx+pad-64*sc+Math.round(4*u), by+(bh-160*sc)/2-30*sc); x.scale(sc,sc); x.fillStyle='#fff'; x.fill(PIN); x.fillStyle='#1d4ed8'; x.beginPath(); x.arc(120,88,24,0,7); x.fill(); x.restore();
-  const tx=bx+pad*2+iconW;
-  x.fillStyle='#fff'; x.font=`700 ${f1}px -apple-system,Segoe UI,Roboto,sans-serif`; x.textBaseline='top'; x.fillText(t1,tx,by+pad);
-  x.fillStyle='#bfdbfe'; x.font=`600 ${f2}px -apple-system,Segoe UI,Roboto,sans-serif`; x.fillText(t2,tx,by+pad+f1+Math.round(4*u));
-  x.fillStyle='#f59e0b'; x.fillText('.', tx+w2+1, by+pad+f1+Math.round(4*u));
-  return await new Promise(r=>c.toBlob(r,'image/jpeg',0.9));
-}
-async function shareCurrent(save){
-  $('vMsg').textContent='Preparing…';
-  try{ const blob=await brandedBlob($('viewImg').src); const file=new File([blob],'campos-do-jordao.jpg',{type:'image/jpeg'});
-    if(!save && navigator.canShare && navigator.canShare({files:[file]})){ await navigator.share({files:[file], title:'Campos do Jordão', text:'📍 Campos do Jordão · Right Here, Right Now'}); $('vMsg').textContent=''; return; }
-    const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='campos-do-jordao.jpg'; document.body.appendChild(a); a.click(); a.remove(); $('vMsg').textContent='Saved to your downloads.';
-  }catch(e){ $('vMsg').textContent = (e && e.name==='AbortError') ? '' : 'Could not prepare this photo. Try again with signal.'; }
-}
-$('vShare').onclick=e=>{ e.stopPropagation(); shareCurrent(false); };
-$('vSave').onclick=e=>{ e.stopPropagation(); shareCurrent(true); };
-$('vClose').onclick=e=>{ e.stopPropagation(); $('viewer').classList.remove('open'); $('vMsg').textContent=''; };
-
-$('fab').onclick=()=>{ $('who').value=store.get('cdj_who',''); $('addSheet').classList.add('open'); };
-$('albumBtn').onclick=openAlbum;
-document.querySelectorAll('[data-close]').forEach(b=>b.onclick=()=>$(b.dataset.close).classList.remove('open'));
-$('takeBtn').onclick=()=>$('camIn').click(); $('pickBtn').onclick=()=>$('galIn').click();
-$('camIn').onchange=e=>{ addFiles([...e.target.files]); e.target.value=''; };
-$('galIn').onchange=e=>{ addFiles([...e.target.files]); e.target.value=''; };
-updateBadge(); flush();
-
-showScene('drive1'); renderStops(); drawMap(); try{ renderWalk(); }catch(e){}
-
-// ---------- restore after refresh ----------
-(function(){
-  const st=store.get('cdj_state',null); if(!st || !st.started || Date.now()-(st.t||0)>12*3600*1000) return;
-  started=true; $('start').textContent='Tour running'; $('start').classList.add('secondary');
-  queue=(st.queue||[]).filter(id=>STOPS.find(s=>s.id===id)||FILLERS.find(s=>s.id===id)||MUSEUM.find(s=>s.id===id)||WALKSTORIES.find(s=>s.id===id));
-  beginTracking();
-  if(st.cur){ const stop=STOPS.find(s=>s.id===st.cur.id)||FILLERS.find(s=>s.id===st.cur.id)||MUSEUM.find(s=>s.id===st.cur.id)||WALKSTORIES.find(s=>s.id===st.cur.id);
-    if(stop){ current={stop, sentences:buildSeq(stop.id,stop), idx:Math.min(st.cur.idx||0, 999), token:Math.random()};
-      current.idx=Math.min(current.idx, current.sentences.length-1); paused=true;
-      showScene(stop.id); showLook(stop.id); $('nowTitle').textContent='🔊 '+stop.name;
-      const it=current.sentences[current.idx]; $('nowLine').textContent=typeof it==='object'?(it.t||''):it;
-      ['pauseBtn','stopBtn','skipBtn'].forEach(b=>$(b).disabled=false); $('pauseBtn').textContent='Resume';
-      syncPause();
-      $('status').innerHTML='<span class="ok">Tour restored.</span> Tap ▶ Resume to continue where you left off.';
-    } }
-  else $('status').innerHTML='<span class="ok">Tour restored.</span> GPS is back on; stops will play as you arrive.';
-})();
-
-fetchPhotos().then(()=>{ if(!current) showScene('drive1'); });
 </script>
 </body>
 </html>
