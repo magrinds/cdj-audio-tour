@@ -573,7 +573,13 @@ function onFix(pos){
     }
   }
   if($('auto').checked && !current && !queue.length && spd!=null && spd>4 && Date.now()-lastActivity>25000){
-    const f = FILLERS.find(f=>!played.has(f.id)); if(f) startStop(f.id);
+    // seconds until we reach the edge of the next stop that could auto-play
+    let eta=Infinity;
+    for(const p of STOPS){ if(!p.radius || played.has(p.id)) continue; if(p.after && !played.has(p.after)) continue; if(p.before && played.has(p.before)) continue;
+      const edge=Math.max(0, dist(c.latitude,c.longitude,p.lat,p.lng)-p.radius); eta=Math.min(eta, edge/spd); }
+    const dur=f=>buildSeq(f.id,f).reduce((a,it)=>a+estSec(it),0);
+    const fits = FILLERS.filter(f=>!played.has(f.id)).map(f=>({f,d:dur(f)})).filter(x=>x.d+20<eta);
+    if(fits.length){ fits.sort((a,b)=>b.d-a.d); startStop(fits[0].f.id); }
   }
   renderStops(); drawMap();
 }
