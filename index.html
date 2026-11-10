@@ -280,6 +280,31 @@ Thank you for joining the tour. I hope Campos do Jordão now feels like more tha
 
 
 
+
+const MUSEUM = [
+ {id:"m_start", name:"How to walk the museum", look:"Look for: the map board and phase signs", text:`Welcome to the walking part of the museum. Here's how it works. The sculptures are laid out along forest paths in five sections, one for each phase of Felícia's career, and the artist herself chose where many of them stand. Signs mark each phase and show how steep each path is. There are a few climbs, so take it slow. Every sculpture has a small plaque with its name, material, and phase, and some have QR codes with more information. Tap the next track in the Museum walk list each time you reach a new phase sign. The whole loop takes about an hour at an easy pace. And remember: this is a living garden, with more than a hundred species of Mantiqueira plants, so look up as often as you look at the art.`},
+ {id:"m_figurative", name:"Phase 1 · Figurative (1950 to 1958)", look:"Look for: bronze figures, mothers and children", text:`This is where it all began: the Figurative phase, from 1950 to 1958, mostly in bronze. Remember, Felícia only started sculpting at forty four, studying with Victor Brecheret, the sculptor behind the giant Monument to the Bandeirantes in São Paulo's Ibirapuera Park. You can feel his influence in these smooth, heavy, monumental forms.
+Her subjects here are human, and very personal: mothers, children, couples, families. She had spent twenty years raising three children, and that life is right here in bronze. Look at how the figures lean into each other, and how arms and bodies merge into a single shape.
+She was good, and fast. In 1955 she won an acquisition prize from the Museum of Modern Art in Rio de Janeiro, and by 1957 her sculptures had entered the collections of the São Paulo Museum of Art, MASP, and the Museum of Modern Art in Paris.`, quiz:{ask:"In this first phase, what were Felícia's favorite subjects?", ans:"People: mothers, children, couples and families."}},
+ {id:"m_toward", name:"Phase 2 · Toward abstraction (1958 to 1961)", look:"Look for: figures starting to dissolve into shapes", text:`Now watch the people start to disappear. This is the phase called A Caminho da Abstração, on the way to abstraction, from 1958 to 1961.
+What changed? The São Paulo Biennial. Starting in 1951, this huge international exhibition brought the newest European and American art to Brazil, and it shook up a whole generation of artists. Felícia exhibited there, saw abstract art up close, and began to loosen her grip on the human figure.
+Play a game here: in each sculpture, try to find the person who is still hiding inside. Sometimes it's a head, sometimes the curve of a back, sometimes just a gesture. A few years earlier these would have been obvious figures. Now they're halfway to pure form.`},
+ {id:"m_abstract", name:"Phase 3 · Abstract (1963 to 1965)", look:"Look for: sculptures set in alleys and semicircles", text:`Welcome to the Abstract phase, 1963 to 1965. The figures are gone. What's left is pure form, texture, and rhythm.
+Notice how these pieces are displayed, in alleys and semicircles, surrounded by Mantiqueira plants. Walk around them. Abstract sculpture changes completely depending on where you stand, and on the light through the trees.
+This is the phase of her biggest honor. In 1963, at the São Paulo Biennial, the same exhibition that had transformed her style, Felícia was named Best Brazilian Sculptor. Not bad for someone who had picked up her first sculpting tools just fifteen years earlier.
+It was also a time of grief and change. In 1962 her husband died, and she left São Paulo to live here in Campos do Jordão, closer to nature. Keep that in mind for the next phase, because nature is about to take over her work.`, quiz:{ask:"What award did Felícia win at the 1963 São Paulo Biennial?", ans:"Best Brazilian Sculptor."}},
+ {id:"m_organic", name:"Phase 4 · Organic (1966 to 1970)", look:"Look for: white reinforced-cement shapes like seeds and stones", text:`This is the Organic phase, from 1966 to 1970, and the material changes too: reinforced cement instead of bronze.
+By now Felícia was living up here in the mountains, and you can see it. These shapes feel grown rather than made. Look for forms that remind you of seeds, pods, river stones, bones, or shells. Nothing here has a straight edge, because almost nothing in a forest does.
+Here's a detail many visitors miss: these sculptures are a lot of work to keep. They stand outdoors all year in mountain rain, sun, and frost, so the museum runs a permanent conservation program to keep them from wearing away.
+Nearby you may also find a series called Bichos, which means critters, or little animals. See which creatures you can spot among the trees.`},
+ {id:"m_recortes", name:"Phase 5 · Recortes na Paisagem (1980 to 1982)", look:"Look for: cut-out shapes among the Araucaria pines", text:`The final phase, and the one made for this exact place: Recortes na Paisagem, cut-outs in the landscape, from 1980 to 1982. Felícia was in her late seventies when she made them.
+These pieces stand among the Araucaria pines on purpose. Try this: crouch down and look through the openings and gaps in each sculpture. They frame the forest, the sky, and the mountains like windows. The landscape becomes part of the artwork, and the artwork becomes a way of looking at the landscape.
+It's a beautiful ending to a career that began with bronze mothers and children in a São Paulo studio. Thirty years later, the subject is this mountain itself. She finished her work for the museum in 1982, and lived here until she died in 1996, at ninety two.`, quiz:{ask:"What does Recortes na Paisagem mean?", ans:"Cut-outs in the landscape. The sculptures frame the forest like windows."}},
+ {id:"m_concha", name:"The acoustic shell and the view", look:"Look for: Pedra do Baú on the horizon", text:`Before you leave, find the concha acústica, the outdoor acoustic shell. It's used for concerts and cultural events, and on a clear day it has one of the best views on the property.
+Look to the horizon for Pedra do Baú, a huge granite rock formation shaped a bit like a trunk or a chest. Baú means trunk in Portuguese. At almost two thousand meters, it's one of the most famous landmarks of the Mantiqueira, and climbers come from all over Brazil to scale it on iron rungs fixed into the rock.
+Take a moment here. You've just walked through thirty years of one woman's life, from Warsaw to Campos do Jordão. When you're ready, head back toward the auditorium, and don't forget to arrange your ride back down.`}
+];
+
 const ORDER=['drive1','jaguaribe','mantiqueira','felicia','auditorio','palacio','tb','abernessia','mercado','teresinha','mosteiro'];
 STOPS.sort((a,b)=>ORDER.indexOf(a.id)-ORDER.indexOf(b.id));
 const FILLERS = [
@@ -344,15 +369,15 @@ const SCENES = {
 };
 const SCENE_ALIAS={jaguaribe:'drive1',mantiqueira:'tb',mercado:'abernessia',teresinha:'mosteiro'};
 function showScene(id){
-  const s=SCENES[id]||SCENES[SCENE_ALIAS[id]]||(String(id).startsWith('f_')?SCENES.drive1:null); const p=STOPS.find(x=>x.id===id); if(!s) return;
-  const ph = PHOTOS[id] || (SCENE_ALIAS[id] && PHOTOS[SCENE_ALIAS[id]]);
-  const cap = `<div class="cap fade">${(STOPS.find(x=>x.id===id)||FILLERS.find(x=>x.id===id)||{}).name||s.c}<small>${LOOK[id]||(String(id).startsWith('f_')?'Story time while we drive':'')}</small></div>`;
+  const s=SCENES[id]||SCENES[SCENE_ALIAS[id]]||(String(id).startsWith('f_')?SCENES.drive1:null)||(String(id).startsWith('m_')?SCENES.felicia:null); const p=STOPS.find(x=>x.id===id); if(!s) return;
+  const ph = PHOTOS[id] || (SCENE_ALIAS[id] && PHOTOS[SCENE_ALIAS[id]]) || (String(id).startsWith('m_') && PHOTOS.felicia);
+  const cap = `<div class="cap fade">${(STOPS.find(x=>x.id===id)||FILLERS.find(x=>x.id===id)||MUSEUM.find(x=>x.id===id)||{}).name||s.c}<small>${LOOK[id]||(MUSEUM.find(x=>x.id===id)||{}).look||(String(id).startsWith('f_')?'Story time while we drive':'')}</small></div>`;
   if(ph){
     $('stage').innerHTML = `<img class="scene fade" src="${ph.url}" alt="" style="--ox:${s.ox};--oy:${s.oy};--tx:${s.tx};--ty:${s.ty}"><div class="credit">${ph.credit}</div>`+cap;
     $('stage').querySelector('img').onerror=()=>{ delete PHOTOS[id]; showScene(id); };
     return;
   }
-  $('stage').innerHTML = `<svg class="scene fade" viewBox="0 0 400 225" preserveAspectRatio="xMidYMid slice" style="--ox:${s.ox};--oy:${s.oy};--tx:${s.tx};--ty:${s.ty}">${s.svg}</svg><div class="cap fade">${(STOPS.find(x=>x.id===id)||FILLERS.find(x=>x.id===id)||{}).name||s.c}<small>${LOOK[id]||(String(id).startsWith('f_')?'Story time while we drive':'')}</small></div>`;
+  $('stage').innerHTML = `<svg class="scene fade" viewBox="0 0 400 225" preserveAspectRatio="xMidYMid slice" style="--ox:${s.ox};--oy:${s.oy};--tx:${s.tx};--ty:${s.ty}">${s.svg}</svg><div class="cap fade">${(STOPS.find(x=>x.id===id)||FILLERS.find(x=>x.id===id)||MUSEUM.find(x=>x.id===id)||{}).name||s.c}<small>${LOOK[id]||(MUSEUM.find(x=>x.id===id)||{}).look||(String(id).startsWith('f_')?'Story time while we drive':'')}</small></div>`;
 }
 
 const PHOTO_Q = { drive1:"Capivari Campos do Jordão", jaguaribe:"Campos do Jordão cidade", mantiqueira:"Serra da Mantiqueira Campos do Jordão",
@@ -458,14 +483,16 @@ function renderStops(){
     return `<div class="stop"><div class="num ${done?'done':''}">${i+1}</div>
       <div class="info"><div class="name">${p.name}</div><div class="meta">${d?d+' away · ':''}${done?'played · ':''}${trig}</div></div>
       <button data-play="${p.id}" ${isArmed('play:'+p.id)?'style="background:var(--accent2)"':''}>${isArmed('play:'+p.id)?armed.label:'▶'}</button></div>`;
-  }).join('') + `<div style="margin-top:12px;font-weight:700;font-size:14px;color:var(--accent)">🚗 Stories for the road (auto-play while moving)</div>` +
+  }).join('') + `<div style="margin-top:12px;font-weight:700;font-size:14px;color:var(--accent)">🗿 Museum walk (tap ▶ at each phase sign)</div>` +
+  MUSEUM.map((m,i)=>`<div class="stop"><div class="num ${played.has(m.id)?'done':''}">${String.fromCharCode(65+i)}</div><div class="info"><div class="name">${m.name}</div><div class="meta">${played.has(m.id)?'played · ':''}${m.look.replace('Look for: ','')}</div></div><button data-play="${m.id}" ${isArmed('play:'+m.id)?'style="background:var(--accent2)"':''}>${isArmed('play:'+m.id)?armed.label:'▶'}</button></div>`).join('') +
+  `<div style="margin-top:12px;font-weight:700;font-size:14px;color:var(--accent)">🚗 Stories for the road (auto-play while moving)</div>` +
   FILLERS.map(f=>`<div class="stop"><div class="num ${played.has(f.id)?'done':''}">★</div><div class="info"><div class="name">${f.name.replace('Story: ','').replace(/^./,c=>c.toUpperCase())}</div><div class="meta">${played.has(f.id)?'played':'plays when nothing else is'}</div></div><button data-play="${f.id}" ${isArmed('play:'+f.id)?'style="background:var(--accent2)"':''}>${isArmed('play:'+f.id)?armed.label:'▶'}</button></div>`).join('');
   document.querySelectorAll('[data-play]').forEach(b=>b.onclick=()=>{ unlockAudio();
     const id=b.dataset.play;
     if(current){ confirmTap('play:'+id, current.stop.id===id?'Restart?':'Switch?', ()=>playNow(id), renderStops); return; }
     playNow(id); });
 }
-$('scripts').innerHTML = STOPS.concat(FILLERS).map((p,i)=>`<h3 style="margin:14px 0 0;font-size:15px">${i+1}. ${p.name}</h3><div class="script">${p.text}</div>`).join('');
+$('scripts').innerHTML = STOPS.concat(MUSEUM,FILLERS).map((p,i)=>`<h3 style="margin:14px 0 0;font-size:15px">${i+1}. ${p.name}</h3><div class="script">${p.text}</div>`).join('');
 
 // ---------- speech ----------
 function splitSentences(t){ return t.replace(/\n+/g,' ').match(/[^.!?]+[.!?]+["”]?|[^.!?]+$/g).map(s=>s.trim()).filter(Boolean); }
@@ -513,11 +540,12 @@ function speakNext(){
   synth.speak(u);
 }
 function buildSeq(id, stop){ const seq = splitSentences(stop.text);
+  if(stop.quiz && !QUIZ[id]) QUIZ[id]=stop.quiz;
   if(QUIZ[id]){ seq.push({quiz:'ask', t:'Quiz time! '+QUIZ[id].ask}); seq.push({pause:8}); seq.push({quiz:'answer', t:'The answer: '+QUIZ[id].ans}); }
   return seq; }
 function saveState(){ store.set('cdj_state',{ started, paused, queue, cur: current?{id:current.stop.id, idx:current.idx}:null, t:Date.now() }); }
 function startStop(id){
-  const stop = STOPS.find(s=>s.id===id) || FILLERS.find(s=>s.id===id); if(!stop) return;
+  const stop = STOPS.find(s=>s.id===id) || FILLERS.find(s=>s.id===id) || MUSEUM.find(s=>s.id===id); if(!stop) return;
   lastActivity=Date.now();
   synth && synth.cancel();
   paused=false;
@@ -533,6 +561,7 @@ function startStop(id){
   setTimeout(speakNext, 150);
 }
 function finishCurrent(){
+  if(current && current.stop.id==='felicia' && !played.has('m_start') && !queue.includes('m_start')) queue.unshift('m_start');
   lastActivity=Date.now(); current=null; clearTimeout(qTimer); saveState(); $('nowTitle').textContent='Nothing playing'; $('nowLine').textContent='';
   ['pauseBtn','stopBtn','skipBtn'].forEach(b=>$(b).disabled=true);
   syncPause();
@@ -814,9 +843,9 @@ showScene('drive1'); renderStops(); drawMap();
 (function(){
   const st=store.get('cdj_state',null); if(!st || !st.started || Date.now()-(st.t||0)>12*3600*1000) return;
   started=true; $('start').textContent='Tour running'; $('start').classList.add('secondary');
-  queue=(st.queue||[]).filter(id=>STOPS.find(s=>s.id===id)||FILLERS.find(s=>s.id===id));
+  queue=(st.queue||[]).filter(id=>STOPS.find(s=>s.id===id)||FILLERS.find(s=>s.id===id)||MUSEUM.find(s=>s.id===id));
   beginTracking();
-  if(st.cur){ const stop=STOPS.find(s=>s.id===st.cur.id)||FILLERS.find(s=>s.id===st.cur.id);
+  if(st.cur){ const stop=STOPS.find(s=>s.id===st.cur.id)||FILLERS.find(s=>s.id===st.cur.id)||MUSEUM.find(s=>s.id===st.cur.id);
     if(stop){ current={stop, sentences:buildSeq(stop.id,stop), idx:Math.min(st.cur.idx||0, 999), token:Math.random()};
       current.idx=Math.min(current.idx, current.sentences.length-1); paused=true;
       showScene(stop.id); $('nowTitle').textContent='🔊 '+stop.name;
