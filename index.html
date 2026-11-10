@@ -94,6 +94,8 @@
   .ridebox .rlabel { color:var(--accent); font-weight:700; }
   .ridebox .chev { color:var(--mute); transition:transform .2s; } .ridebox[open] .chev { transform:rotate(180deg); }
   .ridebox .ridebody { background:#fff; border:1px solid var(--line); border-radius:18px; padding:14px; margin-top:8px; box-shadow:0 6px 20px rgba(29,78,216,.08); }
+  .fabp { position:fixed; left:16px; bottom:26px; z-index:20; padding:12px 18px; font-size:16px; background:var(--deep); color:#fff; box-shadow:0 6px 18px rgba(11,42,91,.35); }
+  .fabp.resume { background:var(--accent2); }
 </style>
 </head>
 <body>
@@ -173,6 +175,7 @@
 
 
 <button class="fab" id="fab" aria-label="Add photo">📷<span class="badge" id="badge"></span></button>
+<button class="fabp" id="fabPause" style="display:none">⏸ Pause</button>
 <button class="fab2" id="albumBtn">🖼 Album</button>
 <input type="file" id="camIn" accept="image/*" capture="environment" hidden>
 <input type="file" id="galIn" accept="image/*" multiple hidden>
@@ -502,11 +505,13 @@ function startStop(id){
   renderStops(); drawMap();
   if(document.body.classList.contains('hoh') && navigator.vibrate){ try{ navigator.vibrate([200,100,200]); }catch(e){} }
   if(!synth && !document.body.classList.contains('hoh')){ $('nowLine').textContent='Speech not supported in this browser.'; return; }
+  syncPause();
   setTimeout(speakNext, 150);
 }
 function finishCurrent(){
   lastActivity=Date.now(); current=null; clearTimeout(qTimer); $('nowTitle').textContent='Nothing playing'; $('nowLine').textContent='';
   ['pauseBtn','stopBtn','skipBtn'].forEach(b=>$(b).disabled=true);
+  syncPause();
   if(queue.length){ const n=queue.shift(); setTimeout(()=>startStop(n),800); }
 }
 function playNow(id){ queue = queue.filter(q=>q!==id); startStop(id); }
@@ -514,9 +519,12 @@ function enqueue(id){
   if(played.has(id) || queue.includes(id) || (current && current.stop.id===id)) return;
   if(!current) startStop(id); else queue.push(id);
 }
-$('pauseBtn').onclick = ()=>{ if(!current) return;
+function togglePause(){ if(!current) return;
   if(!paused){ paused=true; clearTimeout(qTimer); synth && synth.cancel(); $('pauseBtn').textContent='Resume'; }
-  else { paused=false; $('pauseBtn').textContent='Pause'; current.token=Math.random(); speakNext(); } };
+  else { paused=false; $('pauseBtn').textContent='Pause'; current.token=Math.random(); speakNext(); }
+  syncPause(); }
+function syncPause(){ const f=$('fabPause'); f.style.display=current?'':'none'; f.textContent=paused?'▶ Resume':'⏸ Pause'; f.classList.toggle('resume',paused); }
+$('pauseBtn').onclick=togglePause; $('fabPause').onclick=togglePause;
 $('stopBtn').onclick = ()=>{ queue=[]; synth && synth.cancel(); current=null; paused=false; finishCurrent(); };
 $('skipBtn').onclick = ()=>{ synth && synth.cancel(); current=null; paused=false; finishCurrent(); };
 $('testVoice').onclick = ()=>{ unlockAudio(); synth.cancel(); const u=new SpeechSynthesisUtterance('Bem-vindo! Welcome to Campos do Jordão.'); const v=voices.find(v=>v.name===$('voice').value); if(v){u.voice=v;u.lang=v.lang;} u.rate=+$('rate').value; synth.speak(u); };
