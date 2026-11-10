@@ -971,11 +971,19 @@ function sayAnswer(text){
   if(document.body.classList.contains('hoh') || !synth) return;
   synth.cancel(); const u=new SpeechSynthesisUtterance(text); const v=voices.find(v=>v.name===$('voice').value); if(v){u.voice=v;u.lang=v.lang;} u.rate=+$('rate').value; synth.speak(u);
 }
+let askHist=[]; try{ askHist=JSON.parse(sessionStorage.getItem('cdj_askhist')||'[]'); }catch(e){}
+function tourOverview(){
+  const first=t=>splitSentences(t).slice(0,2).join(' ').slice(0,280);
+  const line=(p,kind)=>`- ${p.name}${kind?' ['+kind+']':''}${played.has(p.id)?' (already heard)':''}: ${first(p.text)}`;
+  return STOPS.map(p=>line(p,'stop')).concat(MUSEUM.map(p=>line(p,'museum walk')), WALKSTORIES.map(p=>line(p,'walking story')), FILLERS.map(p=>line(p,'road story'))).join('\n');
+}
+const TRIP="Guests are staying at Hotel Le Renard in Capivari, Campos do Jordão (Av. Macedo Soares area). The tour's first stop, 'Drive up to Alto da Boa Vista', starts at the hotel, so being near it means being at the hotel. Today's tour: Uber up to the Felícia Leirner outdoor sculpture museum and Auditório Claudio Santoro in Alto da Boa Vista, past the Palácio Boa Vista, then down to Abernéssia and the Benedictine Mosteiro de São João, then back to the hotel.";
 function askContext(){
   const n=nearestStopInfo();
   return { lat:lastFix?lastFix.lat:null, lng:lastFix?lastFix.lng:null, near:n?n.stop.name:'', nearDist:n?fmt(n.d):'',
     playing: current?current.stop.name:'', local:new Date().toLocaleString('en-US',{timeZone:'America/Sao_Paulo',weekday:'short',hour:'2-digit',minute:'2-digit'}),
-    script: (current?current.stop.text:'') + '\n' + (n && n.d<1500 ? n.stop.text : '') };
+    script: (current?current.stop.text:'') + '\n' + (n && n.d<1500 ? n.stop.text : ''),
+    trip: TRIP, overview: tourOverview(), history: askHist.slice(-4) };
 }
 async function ask(){
   const q=$('askIn').value.trim(); if(!q) return;
@@ -988,6 +996,7 @@ async function ask(){
   if(!ans){ ans=localAnswer(q); if(ans) ans=(src==='notcfg'?'':'')+ans; }
   if(!ans) ans = navigator.onLine ? "That one isn't covered in my tour notes, and I can't reach Claude right now. Try asking museum staff, or rephrase the question." : "I can't reach Claude without signal, and I didn't find that in the tour notes. Try again when you have signal.";
   $('askAns').innerHTML = ans.replace(/</g,'&lt;') + `<div class="status" style="margin-top:8px">${src==='Claude'?'Answered by Claude using your location.':'From the tour notes on this phone (offline answer).'}${src==='notcfg'?' Claude answers need setup: see the owner note.':''}${src==='err'?' (Claude unavailable: '+errMsg.replace(/</g,'&lt;').slice(0,120)+')':''}</div>`;
+  if(src==='Claude'){ askHist.push({q, a:ans}); askHist=askHist.slice(-6); try{ sessionStorage.setItem('cdj_askhist',JSON.stringify(askHist)); }catch(e){} }
   $('askSay').style.display=''; $('askSay').onclick=()=>sayAnswer(ans);
   sayAnswer(ans);
 }
