@@ -56,6 +56,23 @@
   .quiz .qa { font-size:18px; margin-top:8px; color:#2c7a3f; font-weight:600; display:none; }
   .quiz .qc { font-size:28px; font-weight:800; color:var(--accent2); margin-top:4px; }
   .fade { animation:fadein .8s ease; } @keyframes fadein { from{opacity:0} to{opacity:1} }
+
+  .fab { position:fixed; right:16px; bottom:18px; z-index:20; width:64px; height:64px; border-radius:50%; font-size:28px; padding:0; background:linear-gradient(135deg,#1d4ed8,#3b82f6); box-shadow:0 8px 24px rgba(11,42,91,.4); }
+  .fab .badge { position:absolute; top:-4px; right:-4px; background:var(--accent2); color:#fff; font-size:12px; font-weight:800; border-radius:999px; padding:2px 7px; display:none; }
+  .fab2 { position:fixed; right:90px; bottom:26px; z-index:20; padding:12px 16px; background:#fff; color:var(--deep); box-shadow:0 6px 18px rgba(11,42,91,.25); }
+  .sheet { position:fixed; inset:0; background:rgba(11,42,91,.55); z-index:30; display:none; align-items:flex-end; }
+  .sheet.open { display:flex; }
+  .sheet .panel { background:#fff; width:100%; max-height:88vh; overflow:auto; border-radius:22px 22px 0 0; padding:16px; }
+  .sheet h2 { margin:0 0 10px; font-size:19px; }
+  .sheet input[type=text] { width:100%; font:inherit; padding:12px; border:1px solid var(--line); border-radius:12px; margin:6px 0 12px; }
+  .grid { display:grid; grid-template-columns:repeat(3,1fr); gap:6px; margin-top:10px; }
+  .grid div { position:relative; aspect-ratio:1; border-radius:10px; overflow:hidden; background:#e3eefb; }
+  .grid img { width:100%; height:100%; object-fit:cover; display:block; }
+  .grid .tag { position:absolute; left:0; right:0; bottom:0; font-size:10px; color:#fff; padding:10px 4px 3px; background:linear-gradient(transparent,rgba(0,0,0,.7)); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .grid .pend { position:absolute; top:4px; left:4px; font-size:10px; background:var(--accent2); color:#fff; border-radius:6px; padding:1px 5px; }
+  .viewer { position:fixed; inset:0; background:#000; z-index:40; display:none; align-items:center; justify-content:center; }
+  .viewer.open { display:flex; } .viewer img { max-width:100%; max-height:100%; }
+  main { padding-bottom:100px; }
 </style>
 </head>
 <body>
@@ -118,6 +135,24 @@
   </div>
 </main>
 
+
+<button class="fab" id="fab" aria-label="Add photo">📷<span class="badge" id="badge"></span></button>
+<button class="fab2" id="albumBtn">🖼 Album</button>
+<input type="file" id="camIn" accept="image/*" capture="environment" hidden>
+<input type="file" id="galIn" accept="image/*" multiple hidden>
+<div class="sheet" id="addSheet"><div class="panel">
+  <h2>📷 Add to the tour album</h2>
+  <label>Your name</label><input type="text" id="who" placeholder="e.g. Marcus">
+  <div class="row"><button id="takeBtn" style="flex:1">Take photo</button><button id="pickBtn" class="secondary" style="flex:1">From gallery</button></div>
+  <div class="status" id="upStatus">Photos upload right away when you have signal, or wait safely on this phone until you do.</div>
+  <div class="row" style="margin-top:12px"><button class="secondary" data-close="addSheet" style="flex:1">Close</button></div>
+</div></div>
+<div class="sheet" id="albumSheet"><div class="panel">
+  <div class="row" style="justify-content:space-between"><h2 style="margin:0">🖼 Tour album</h2><button class="secondary" data-close="albumSheet">Close</button></div>
+  <div class="status" id="albumStatus">Loading…</div>
+  <div class="grid" id="grid"></div>
+</div></div>
+<div class="viewer" id="viewer"><img id="viewImg" alt=""></div>
 <script>
 const STOPS = [
  { id:"drive1", name:"Drive up to Alto da Boa Vista", lat:-22.7194257, lng:-45.5611975, radius:0, walk:false, mapLabel:"Hotel",
@@ -494,6 +529,63 @@ if('serviceWorker' in navigator){
     if(!started) $('status').innerHTML = (navigator.serviceWorker.controller?'<span class="ok">Saved for offline use.</span> ':'Saving offline copy… ') + 'Tap Start when you leave the hotel.';
   }).catch(()=>{});
 }
+
+// ---------- photo album ----------
+const SB='https://otlbfbqdwygrkxtvgfyp.supabase.co', SBK='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im90bGJmYnFkd3lncmt4dHZnZnlwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE3MDI0MTksImV4cCI6MjA5NzI3ODQxOX0.9D-bMdK6At0CQijs27z0IT8-lpUEu6I4bZrdPko6PQU';
+const BUCKET='tour-photos', ALBUM='campos-do-jordao';
+let dbp=null;
+function idb(){ if(dbp) return dbp; dbp=new Promise((res,rej)=>{ try{ const r=indexedDB.open('cdj-photos',1); r.onupgradeneeded=()=>r.result.createObjectStore('q',{keyPath:'path'}); r.onsuccess=()=>res(r.result); r.onerror=()=>rej(r.error);}catch(e){rej(e);} }); return dbp; }
+async function qAll(){ try{ const d=await idb(); return await new Promise(r=>{ const t=d.transaction('q').objectStore('q').getAll(); t.onsuccess=()=>r(t.result||[]); t.onerror=()=>r([]); }); }catch(e){ return []; } }
+async function qPut(o){ const d=await idb(); return new Promise((r,j)=>{ const t=d.transaction('q','readwrite'); t.objectStore('q').put(o); t.oncomplete=r; t.onerror=()=>j(t.error); }); }
+async function qDel(k){ const d=await idb(); return new Promise(r=>{ const t=d.transaction('q','readwrite'); t.objectStore('q').delete(k); t.oncomplete=r; t.onerror=r; }); }
+const slug=s=>(s||'guest').normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-zA-Z0-9]+/g,'-').replace(/^-|-$/g,'').slice(0,24)||'guest';
+async function shrink(file){
+  try{ const bmp=await createImageBitmap(file); const k=Math.min(1,1600/Math.max(bmp.width,bmp.height));
+    const c=document.createElement('canvas'); c.width=Math.round(bmp.width*k); c.height=Math.round(bmp.height*k); c.getContext('2d').drawImage(bmp,0,0,c.width,c.height);
+    return await new Promise(r=>c.toBlob(b=>r(b||file),'image/jpeg',0.82)); }catch(e){ return file; }
+}
+function nearestStop(){ if(!lastFix) return current?current.stop.id:'tour'; let best='tour',bd=1e9; for(const p of STOPS){ const d=dist(lastFix.lat,lastFix.lng,p.lat,p.lng); if(d<bd){bd=d;best=p.id;} } return bd<800?best:'tour'; }
+async function addFiles(files){
+  const who=slug($('who').value); store.set('cdj_who',$('who').value);
+  let n=0;
+  for(const f of files){ const blob=await shrink(f); const stop=current?current.stop.id:nearestStop();
+    const path=`${ALBUM}/${Date.now()}-${Math.random().toString(36).slice(2,6)}__${who}__${stop}.jpg`;
+    try{ await qPut({path, blob, t:Date.now()}); n++; }catch(e){ $('upStatus').textContent='Could not save photo on this phone: '+e; } }
+  $('upStatus').innerHTML=`<span class="ok">${n} photo${n===1?'':'s'} saved.</span> Uploading…`; updateBadge(); flush();
+}
+let flushing=false;
+async function flush(){
+  if(flushing) return; flushing=true;
+  try{ const items=await qAll();
+    for(const it of items){ if(!navigator.onLine) break;
+      try{ const r=await fetch(`${SB}/storage/v1/object/${BUCKET}/${it.path}`,{method:'POST',headers:{apikey:SBK,Authorization:'Bearer '+SBK,'Content-Type':'image/jpeg'},body:it.blob});
+        if(r.ok || r.status===409){ await qDel(it.path); } else { $('upStatus').textContent='Upload paused (server said '+r.status+'). Will retry.'; break; } }catch(e){ break; } }
+  }finally{ flushing=false; }
+  const left=(await qAll()).length; updateBadge();
+  if(left===0) $('upStatus').innerHTML='<span class="ok">All photos uploaded to the album.</span>'; else $('upStatus').textContent=`${left} waiting for signal. They'll upload automatically.`;
+}
+async function updateBadge(){ const n=(await qAll()).length; $('badge').style.display=n?'block':'none'; $('badge').textContent=n; }
+window.addEventListener('online',flush); setInterval(flush,30000);
+const nice=id=>{ const s=STOPS.find(x=>x.id===id)||FILLERS.find(x=>x.id===id); return s? s.name.replace(/\s*\(.*\)/,'') : 'On the road'; };
+async function openAlbum(){
+  $('albumSheet').classList.add('open'); $('albumStatus').textContent='Loading…';
+  const local=await qAll(); let tiles=local.map(it=>({src:URL.createObjectURL(it.blob), name:it.path.split('/').pop(), pend:true}));
+  try{ const r=await fetch(`${SB}/storage/v1/object/list/${BUCKET}`,{method:'POST',headers:{apikey:SBK,Authorization:'Bearer '+SBK,'Content-Type':'application/json'},body:JSON.stringify({prefix:ALBUM,limit:500,sortBy:{column:'name',order:'desc'}})});
+    const j=await r.json(); if(Array.isArray(j)){ tiles=tiles.concat(j.filter(o=>o.name&&o.name.endsWith('.jpg')).map(o=>({src:`${SB}/storage/v1/object/public/${BUCKET}/${ALBUM}/${o.name}`, name:o.name}))); }
+    $('albumStatus').textContent = tiles.length? `${tiles.length} photo${tiles.length===1?'':'s'} from the group`:'No photos yet. Tap 📷 to add the first!';
+  }catch(e){ $('albumStatus').textContent = (tiles.length?'Showing photos on this phone. ':'')+'Offline: the shared album loads when you have signal.'; }
+  $('grid').innerHTML = tiles.map(t=>{ const parts=t.name.replace('.jpg','').split('__'); const who=(parts[1]||'').replace(/-/g,' '); return `<div><img loading="lazy" src="${t.src}" data-full="${t.src}">${t.pend?'<span class="pend">waiting</span>':''}<span class="tag">${who} · ${nice(parts[2])}</span></div>`; }).join('');
+  $('grid').querySelectorAll('img').forEach(i=>i.onclick=()=>{ $('viewImg').src=i.dataset.full; $('viewer').classList.add('open'); });
+}
+$('viewer').onclick=()=>$('viewer').classList.remove('open');
+$('fab').onclick=()=>{ $('who').value=store.get('cdj_who',''); $('addSheet').classList.add('open'); };
+$('albumBtn').onclick=openAlbum;
+document.querySelectorAll('[data-close]').forEach(b=>b.onclick=()=>$(b.dataset.close).classList.remove('open'));
+$('takeBtn').onclick=()=>$('camIn').click(); $('pickBtn').onclick=()=>$('galIn').click();
+$('camIn').onchange=e=>{ addFiles([...e.target.files]); e.target.value=''; };
+$('galIn').onchange=e=>{ addFiles([...e.target.files]); e.target.value=''; };
+updateBadge(); flush();
+
 showScene('drive1'); renderStops(); drawMap();
 fetchPhotos().then(()=>{ if(!current) showScene('drive1'); });
 </script>
