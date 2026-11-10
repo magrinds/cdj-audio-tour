@@ -80,6 +80,11 @@
   .vmsg { position:absolute; top:20px; left:0; right:0; text-align:center; color:#fff; font-size:13px; }
   main { padding-bottom:100px; }
   #reviewGrid div { cursor:pointer; } #reviewGrid div.off img { opacity:.25; filter:grayscale(1); } #reviewGrid .x { position:absolute; top:4px; right:4px; background:rgba(0,0,0,.6); color:#fff; border-radius:50%; width:22px; height:22px; display:flex; align-items:center; justify-content:center; font-size:13px; } #reviewGrid div.off .x { background:var(--accent2); }
+  a.btnlink { display:inline-flex; align-items:center; justify-content:center; flex:1; text-decoration:none; font-weight:700; border-radius:999px; padding:12px 14px; background:#000; color:#fff; }
+  a.btnlink.sec { background:#e6eefb; color:var(--deep); }
+  a.mini { font-size:13px; font-weight:700; text-decoration:none; padding:6px 10px; border-radius:999px; background:#000; color:#fff; margin-left:4px; }
+  a.mini.sec { background:#e6eefb; color:var(--deep); }
+  .dest { display:flex; align-items:center; padding:8px 0; border-top:1px solid var(--line); } .dest .n { flex:1; font-size:14px; font-weight:600; } .dest .m { font-size:12px; color:var(--mute); font-weight:400; }
 </style>
 </head>
 <body>
@@ -105,6 +110,13 @@
     </div>
   </div>
 
+  <div class="card" id="rideCard">
+    <div style="font-size:13px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.04em">🚕 Next ride</div>
+    <div id="rideTo" style="font-size:18px;font-weight:700;margin:4px 0 2px"></div>
+    <div class="status" id="rideNote" style="margin-top:0"></div>
+    <div class="row" style="margin-top:10px"><a id="rideUber" class="btnlink">Open in Uber</a><a id="rideMaps" class="btnlink sec">Google Maps</a></div>
+    <details style="margin-top:12px"><summary style="font-size:14px">Other destinations</summary><div id="rideList"></div></details>
+  </div>
   <div class="card">
     <svg id="map" viewBox="0 0 400 260"></svg>
     <div class="status" id="gpsInfo">GPS: off</div>
@@ -406,6 +418,7 @@ function drawMap(){
 
 // ---------- stop list ----------
 function renderStops(){
+  try{ renderRide(); }catch(e){}
   $('stops').innerHTML = STOPS.map((p,i)=>{
     const d = lastFix ? fmt(dist(lastFix.lat,lastFix.lng,p.lat,p.lng)) : '';
     const done = played.has(p.id);
@@ -549,6 +562,32 @@ if('serviceWorker' in navigator){
   navigator.serviceWorker.register('sw.js').then(()=>{
     if(!started) $('status').innerHTML = (navigator.serviceWorker.controller?'<span class="ok">Saved for offline use.</span> ':'Saving offline copy… ') + 'Tap Start when you leave the hotel.';
   }).catch(()=>{});
+}
+
+
+// ---------- rides ----------
+const DEST = {
+  hotel:{name:"Hotel Le Renard", note:"Back to the hotel", lat:-22.7194257, lng:-45.5611975},
+  museum:{name:"Museu Felícia Leirner", note:"Open Tue to Sun, 9h to 18h", lat:-22.743852, lng:-45.632977},
+  mosteiro:{name:"Mosteiro de São João (Abernéssia)", note:"Shop: 9h30 to 11h45, 13h30 to 14h45, 15h30 to 17h20", lat:-22.7362131, lng:-45.5958014},
+  cezas:{name:"Ceza's Restaurante", note:"Lunch · pay-by-weight buffet · 11h to 15h30", lat:-22.7338056, lng:-45.5860889},
+  joao:{name:"Restaurante do João", note:"Lunch · grilled plates · 8h to 16h", lat:-22.7400725, lng:-45.5925829},
+  terra:{name:"Terra Brasil Restaurante", note:"Lunch · prato feito · 9h30 to 16h", lat:-22.7374672, lng:-45.5915418}
+};
+const uberUrl=d=>`https://m.uber.com/ul/?action=setPickup&pickup=my_location&dropoff[latitude]=${d.lat}&dropoff[longitude]=${d.lng}&dropoff[nickname]=${encodeURIComponent(d.name)}`;
+const mapsUrl=d=>`https://www.google.com/maps/dir/?api=1&destination=${d.lat},${d.lng}&travelmode=driving`;
+function nextRide(){
+  if(!played.has('felicia')) return 'museum';
+  if(!played.has('mosteiro')) return 'mosteiro';
+  return 'hotel';
+}
+function renderRide(){
+  const k=nextRide(), d=DEST[k];
+  $('rideTo').textContent = d.name;
+  const away = lastFix ? ' · '+fmt(dist(lastFix.lat,lastFix.lng,d.lat,d.lng))+' away' : '';
+  $('rideNote').textContent = d.note + away;
+  $('rideUber').href=uberUrl(d); $('rideMaps').href=mapsUrl(d);
+  $('rideList').innerHTML = Object.entries(DEST).filter(([kk])=>kk!==k).map(([kk,v])=>`<div class="dest"><div class="n">${v.name}<div class="m">${v.note}</div></div><a class="mini" href="${uberUrl(v)}">Uber</a><a class="mini sec" href="${mapsUrl(v)}">Maps</a></div>`).join('');
 }
 
 // ---------- photo album ----------
