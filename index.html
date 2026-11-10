@@ -103,6 +103,9 @@
   #askIn { width:100%; font:inherit; font-size:17px; padding:12px; border:1px solid var(--line); border-radius:12px; min-height:70px; resize:vertical; }
   #askAns { font-size:18px; line-height:1.45; margin-top:12px; white-space:pre-wrap; }
   .chips { display:flex; flex-wrap:wrap; gap:6px; margin:8px 0; } .chips button { padding:6px 10px; font-size:13px; background:#e6eefb; color:var(--deep); box-shadow:none; }
+  .toast { position:fixed; left:50%; top:90px; transform:translateX(-50%); background:var(--deep); color:#fff; padding:10px 16px; border-radius:999px; font-size:14px; z-index:50; box-shadow:0 6px 18px rgba(0,0,0,.25); display:none; max-width:90%; text-align:center; }
+  .stop.pressing { background:#fff7e6; border-radius:12px; transition:background .6s; }
+  .stop { -webkit-user-select:none; user-select:none; -webkit-touch-callout:none; }
 </style>
 </head>
 <body>
@@ -164,6 +167,7 @@
   </div>
 
   <div class="card">
+    <div class="status" style="margin:0 0 6px">Tip: long-press any stop to reset it so it plays again.</div>
     <div id="stops"></div>
   </div>
 
@@ -236,6 +240,7 @@
   <div class="status" id="albumStatus">Loading…</div>
   <div class="grid" id="grid"></div>
 </div></div>
+<div class="toast" id="toast"></div>
 <div class="viewer" id="viewer"><img id="viewImg" alt="" crossorigin="anonymous">
   <div class="vbar"><button id="vShare">Share</button><button id="vSave" class="secondary">Save</button><button id="vDel" class="warn" style="display:none">🗑 Delete</button><button id="vClose" class="secondary">Close</button></div>
   <div class="vmsg" id="vMsg"></div></div>
@@ -537,16 +542,16 @@ function renderStops(){
     const d = lastFix ? fmt(dist(lastFix.lat,lastFix.lng,p.lat,p.lng)) : '';
     const done = played.has(p.id);
     const trig = p.radius ? (p.walk? 'plays on arrival (walking)':'plays as you pass') : 'plays when you tap Start';
-    return `<div class="stop"><div class="num ${done?'done':''}">${i+1}</div>
+    return `<div class="stop" data-id="${p.id}"><div class="num ${done?'done':''}">${i+1}</div>
       <div class="info"><div class="name">${p.name}</div><div class="meta">${d?d+' away · ':''}${done?'played · ':''}${trig}</div></div>
       <button data-play="${p.id}" ${isArmed('play:'+p.id)?'style="background:var(--accent2)"':''}>${isArmed('play:'+p.id)?armed.label:'▶'}</button></div>`;
   }).join('') + `<div style="margin-top:12px;font-weight:700;font-size:14px;color:var(--accent)">🗿 Museum walk (tap ▶ at each phase sign)</div>` +
-  MUSEUM.map((m,i)=>`<div class="stop"><div class="num ${played.has(m.id)?'done':''}">${String.fromCharCode(65+i)}</div><div class="info"><div class="name">${m.name}</div><div class="meta">${played.has(m.id)?'played · ':''}${m.look.replace('Look for: ','')}</div></div><button data-play="${m.id}" ${isArmed('play:'+m.id)?'style="background:var(--accent2)"':''}>${isArmed('play:'+m.id)?armed.label:'▶'}</button></div>`).join('') +
+  MUSEUM.map((m,i)=>`<div class="stop" data-id="${m.id}"><div class="num ${played.has(m.id)?'done':''}">${String.fromCharCode(65+i)}</div><div class="info"><div class="name">${m.name}</div><div class="meta">${played.has(m.id)?'played · ':''}${m.look.replace('Look for: ','')}</div></div><button data-play="${m.id}" ${isArmed('play:'+m.id)?'style="background:var(--accent2)"':''}>${isArmed('play:'+m.id)?armed.label:'▶'}</button></div>`).join('') +
   `<div style="margin-top:12px;font-weight:700;font-size:14px;color:var(--accent)">🚶 Walking stories (auto-play while on foot)</div>` +
-  WALKSTORIES.map(f=>`<div class="stop"><div class="num ${played.has(f.id)?'done':''}">👣</div><div class="info"><div class="name">${f.name.replace('Walk: ','').replace(/^./,c=>c.toUpperCase())}</div><div class="meta">${played.has(f.id)?'played':'plays while walking, between stops'}</div></div><button data-play="${f.id}" ${isArmed('play:'+f.id)?'style="background:var(--accent2)"':''}>${isArmed('play:'+f.id)?armed.label:'▶'}</button></div>`).join('') +
+  WALKSTORIES.map(f=>`<div class="stop" data-id="${f.id}"><div class="num ${played.has(f.id)?'done':''}">👣</div><div class="info"><div class="name">${f.name.replace('Walk: ','').replace(/^./,c=>c.toUpperCase())}</div><div class="meta">${played.has(f.id)?'played':'plays while walking, between stops'}</div></div><button data-play="${f.id}" ${isArmed('play:'+f.id)?'style="background:var(--accent2)"':''}>${isArmed('play:'+f.id)?armed.label:'▶'}</button></div>`).join('') +
   `<div style="margin-top:12px;font-weight:700;font-size:14px;color:var(--accent)">🚗 Stories for the road (auto-play while moving)</div>` +
-  FILLERS.map(f=>`<div class="stop"><div class="num ${played.has(f.id)?'done':''}">★</div><div class="info"><div class="name">${f.name.replace('Story: ','').replace(/^./,c=>c.toUpperCase())}</div><div class="meta">${played.has(f.id)?'played':'plays when nothing else is'}</div></div><button data-play="${f.id}" ${isArmed('play:'+f.id)?'style="background:var(--accent2)"':''}>${isArmed('play:'+f.id)?armed.label:'▶'}</button></div>`).join('');
-  document.querySelectorAll('[data-play]').forEach(b=>b.onclick=()=>{ unlockAudio();
+  FILLERS.map(f=>`<div class="stop" data-id="${f.id}"><div class="num ${played.has(f.id)?'done':''}">★</div><div class="info"><div class="name">${f.name.replace('Story: ','').replace(/^./,c=>c.toUpperCase())}</div><div class="meta">${played.has(f.id)?'played':'plays when nothing else is'}</div></div><button data-play="${f.id}" ${isArmed('play:'+f.id)?'style="background:var(--accent2)"':''}>${isArmed('play:'+f.id)?armed.label:'▶'}</button></div>`).join('');
+  document.querySelectorAll('[data-play]').forEach(b=>b.onclick=()=>{ if(Date.now()<suppressClickUntil) return; unlockAudio();
     const id=b.dataset.play;
     if(current){ confirmTap('play:'+id, current.stop.id===id?'Restart?':'Switch?', ()=>playNow(id), renderStops); return; }
     playNow(id); });
@@ -978,6 +983,27 @@ $('micBtn').onclick=()=>{
   if(current && !paused) togglePause();
   r.start();
 };
+
+
+// ---------- long press a stop to reset it ----------
+let suppressClickUntil=0, lp=null;
+function toast(msg){ const t=$('toast'); t.textContent=msg; t.style.display='block'; clearTimeout(t._h); t._h=setTimeout(()=>t.style.display='none',2600); }
+$('stops').addEventListener('pointerdown', e=>{
+  const row=e.target.closest('.stop[data-id]'); if(!row) return;
+  const id=row.dataset.id; row.classList.add('pressing');
+  lp={id, x:e.clientX, y:e.clientY, t:setTimeout(()=>{
+    lp=null; suppressClickUntil=Date.now()+700;
+    played.delete(id); store.set('cdj_played',[...played]); queue=queue.filter(q=>q!==id); saveState();
+    if(navigator.vibrate){ try{ navigator.vibrate(60); }catch(err){} }
+    const s=STOPS.find(x=>x.id===id)||MUSEUM.find(x=>x.id===id)||WALKSTORIES.find(x=>x.id===id)||FILLERS.find(x=>x.id===id);
+    toast(`↺ Reset: "${s?s.name:id}" will play again`); renderStops(); drawMap();
+  }, 650)};
+});
+function lpCancel(e){ if(!lp) { document.querySelectorAll('.stop.pressing').forEach(r=>r.classList.remove('pressing')); return; }
+  if(e && e.type==='pointermove' && Math.hypot(e.clientX-lp.x,e.clientY-lp.y)<10) return;
+  clearTimeout(lp.t); lp=null; document.querySelectorAll('.stop.pressing').forEach(r=>r.classList.remove('pressing')); }
+['pointerup','pointercancel','pointermove'].forEach(ev=>document.addEventListener(ev,lpCancel,{passive:true}));
+$('stops').addEventListener('contextmenu', e=>e.preventDefault());
 
 // ---------- branded share ----------
 const PIN = new Path2D('M120 186 C 92 146, 64 120, 64 88 A 56 56 0 0 1 176 88 C 176 120, 148 146, 120 186 Z');
