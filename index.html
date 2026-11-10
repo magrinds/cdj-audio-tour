@@ -99,6 +99,10 @@
   .fabr { position:fixed; left:16px; bottom:84px; z-index:20; padding:10px 14px; font-size:14px; background:#fff; color:var(--deep); box-shadow:0 6px 18px rgba(11,42,91,.25); }
   .maptabs { margin-bottom:10px; } .maptabs button { flex:1; padding:8px 10px; font-size:13px; } .maptabs button.on { background:var(--accent); color:#fff; }
   #gmap { width:100%; height:320px; border:0; border-radius:14px; display:block; background:#e3eefb; }
+  .fab3 { position:fixed; right:16px; bottom:96px; z-index:20; padding:12px 16px; background:#fff; color:var(--deep); box-shadow:0 6px 18px rgba(11,42,91,.25); }
+  #askIn { width:100%; font:inherit; font-size:17px; padding:12px; border:1px solid var(--line); border-radius:12px; min-height:70px; resize:vertical; }
+  #askAns { font-size:18px; line-height:1.45; margin-top:12px; white-space:pre-wrap; }
+  .chips { display:flex; flex-wrap:wrap; gap:6px; margin:8px 0; } .chips button { padding:6px 10px; font-size:13px; background:#e6eefb; color:var(--deep); box-shadow:none; }
 </style>
 </head>
 <body>
@@ -201,6 +205,7 @@
 <button class="fab" id="fab" aria-label="Add photo">📷<span class="badge" id="badge"></span></button>
 <button class="fabp" id="fabPause" style="display:none">⏸ Pause</button>
 <button class="fabr" id="fabRew" style="display:none">⏪ 10s</button>
+<button class="fab3" id="askBtn">💬 Ask</button>
 <button class="fab2" id="albumBtn">🖼 Album</button>
 <input type="file" id="camIn" accept="image/*" capture="environment" hidden>
 <input type="file" id="galIn" accept="image/*" multiple hidden>
@@ -216,6 +221,15 @@
   <div class="status">Tap a photo to remove it. Only the ones you keep get uploaded.</div>
   <div class="grid" id="reviewGrid"></div>
   <div class="row" style="margin-top:14px"><button id="acceptBtn" style="flex:2">Upload</button><button id="rejectBtn" class="secondary" style="flex:1">Cancel</button></div>
+</div></div>
+<div class="sheet" id="askSheet"><div class="panel">
+  <div class="row" style="justify-content:space-between"><h2 style="margin:0">💬 Ask your guide</h2><button class="secondary" data-close="askSheet">Close</button></div>
+  <div class="status" id="askWhere"></div>
+  <div class="chips" id="askChips"></div>
+  <textarea id="askIn" placeholder="e.g. What is that building on the left? Where can we get a light snack?"></textarea>
+  <div class="row" style="margin-top:8px"><button id="micBtn" class="secondary">🎤 Speak</button><button id="askGo" style="flex:1">Ask</button></div>
+  <div id="askAns"></div>
+  <div class="row" style="margin-top:8px"><button id="askSay" class="secondary" style="display:none">🔊 Read aloud again</button></div>
 </div></div>
 <div class="sheet" id="albumSheet"><div class="panel">
   <div class="row" style="justify-content:space-between"><h2 style="margin:0">🖼 Tour album</h2><button class="secondary" data-close="albumSheet">Close</button></div>
@@ -851,6 +865,7 @@ async function queueBlobs(blobs){
     const path=`${ALBUM}/${Date.now()}-${Math.random().toString(36).slice(2,6)}__${who}__${stop}.jpg`;
     try{ await qPut({path, blob, t:Date.now()}); n++; }catch(e){ $('upStatus').textContent='Could not save photo on this phone: '+e; } }
   $('upStatus').innerHTML=`<span class="ok">${n} photo${n===1?'':'s'} saved.</span> Uploading…`; updateBadge(); flush();
+document.querySelectorAll('[data-close]').forEach(b=>b.onclick=()=>$(b.dataset.close).classList.remove('open'));
 }
 let flushing=false;
 async function flush(){
@@ -897,6 +912,70 @@ $('vDel').onclick=async e=>{ e.stopPropagation();
   }catch(err){ $('vMsg').textContent='Could not delete: '+err.message; delArmed=false; $('vDel').textContent='🗑 Delete'; }
 };
 ownerUI();
+
+
+// ---------- ask your guide ----------
+function nearestStopInfo(){
+  if(!lastFix) return null; let best=null,bd=1e9;
+  for(const p of STOPS){ const d=dist(lastFix.lat,lastFix.lng,p.lat,p.lng); if(d<bd){bd=d;best=p;} }
+  return best?{stop:best,d:bd}:null;
+}
+function localAnswer(q){
+  const norm=s=>s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'');
+  const stop=new Set(['what','where','when','which','with','that','this','there','about','tell','from','have','does','they','their','here','were','would','could','should','long','many','much','some']);
+  const words=[...new Set(norm(q).split(/[^a-z0-9]+/).filter(w=>w.length>3 && !stop.has(w)))];
+  if(!words.length) return '';
+  const n=nearestStopInfo(); const pool=STOPS.concat(MUSEUM,WALKSTORIES,FILLERS);
+  const sens=[]; for(const s of pool) for(const sen of splitSentences(s.text)) sens.push({id:s.id,sen,t:norm(sen)});
+  const stem=w=>w.slice(0,Math.max(4,w.length-2)); const df={}; for(const w of words) df[w]=sens.filter(x=>x.t.includes(stem(w))).length||1;
+  const scored=sens.map(x=>{ let sc=0, hit=0; for(const w of words){ if(x.t.includes(stem(w))){ sc+=1/df[w]; hit++; } } sc+=hit*10;
+    if(sc && n && x.id===n.stop.id) sc*=1.4; if(sc && current && x.id===current.stop.id) sc*=1.4; return {sc,x}; }).filter(o=>o.sc>0);
+  scored.sort((a,b)=>b.sc-a.sc); if(!scored.length) return '';
+  const top=scored[0].x; const same=scored.filter(o=>o.x.id===top.id).slice(0,3).map(o=>o.x.sen);
+  return same.join(' ');
+}
+function sayAnswer(text){
+  if(!text) return;
+  if(current && !paused) togglePause();
+  if(document.body.classList.contains('hoh') || !synth) return;
+  synth.cancel(); const u=new SpeechSynthesisUtterance(text); const v=voices.find(v=>v.name===$('voice').value); if(v){u.voice=v;u.lang=v.lang;} u.rate=+$('rate').value; synth.speak(u);
+}
+function askContext(){
+  const n=nearestStopInfo();
+  return { lat:lastFix?lastFix.lat:null, lng:lastFix?lastFix.lng:null, near:n?n.stop.name:'', nearDist:n?fmt(n.d):'',
+    playing: current?current.stop.name:'', local:new Date().toLocaleString('en-US',{timeZone:'America/Sao_Paulo',weekday:'short',hour:'2-digit',minute:'2-digit'}),
+    script: (current?current.stop.text:'') + '\n' + (n && n.d<1500 ? n.stop.text : '') };
+}
+async function ask(){
+  const q=$('askIn').value.trim(); if(!q) return;
+  $('askAns').textContent='Thinking…'; $('askSay').style.display='none';
+  let ans='', src='';
+  if(navigator.onLine){
+    try{ const r=await fetch(`${SB}/functions/v1/tour-ask`,{method:'POST',headers:{apikey:SBK,Authorization:'Bearer '+SBK,'Content-Type':'application/json'},body:JSON.stringify(Object.assign({question:q},askContext()))});
+      const j=await r.json(); if(r.ok && j.answer){ ans=j.answer; src='Claude'; } else if(j.error==='not_configured'){ src='notcfg'; } }catch(e){}
+  }
+  if(!ans){ ans=localAnswer(q); if(ans) ans=(src==='notcfg'?'':'')+ans; }
+  if(!ans) ans = navigator.onLine ? "I'm not sure about that one. Try asking a staff member nearby, or rephrase the question." : "I can't reach Claude without signal, and I didn't find that in the tour notes. Try again when you have signal.";
+  $('askAns').innerHTML = ans.replace(/</g,'&lt;') + `<div class="status" style="margin-top:8px">${src==='Claude'?'Answered by Claude using your location.':'From the tour notes on this phone (offline answer).'}${src==='notcfg'?' Claude answers need setup: see the owner note.':''}</div>`;
+  $('askSay').style.display=''; $('askSay').onclick=()=>sayAnswer(ans);
+  sayAnswer(ans);
+}
+$('askGo').onclick=()=>{ unlockAudio(); ask(); };
+$('askBtn').onclick=()=>{ const n=nearestStopInfo();
+  $('askWhere').textContent = n? `Near: ${n.stop.name} (${fmt(n.d)})${current?' · playing: '+current.stop.name:''}` : 'Location unknown. Tap Start tour to turn on GPS.';
+  const chips=['What am I looking at?','Where can we get a light snack nearby?','Tell me a fun fact about this place','How long should we spend here?'];
+  $('askChips').innerHTML=chips.map(c=>`<button>${c}</button>`).join(''); $('askChips').querySelectorAll('button').forEach(b=>b.onclick=()=>{ $('askIn').value=b.textContent; unlockAudio(); ask(); });
+  $('askSheet').classList.add('open'); };
+$('micBtn').onclick=()=>{
+  const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+  if(!SR){ $('askAns').textContent='Voice input is not supported in this browser. Type instead, or use your keyboard\'s microphone.'; return; }
+  const r=new SR(); r.lang='en-US'; r.interimResults=true; $('micBtn').textContent='🎙 Listening…';
+  r.onresult=e=>{ $('askIn').value=[...e.results].map(x=>x[0].transcript).join(''); };
+  r.onend=()=>{ $('micBtn').textContent='🎤 Speak'; if($('askIn').value.trim()) ask(); };
+  r.onerror=()=>{ $('micBtn').textContent='🎤 Speak'; };
+  if(current && !paused) togglePause();
+  r.start();
+};
 
 // ---------- branded share ----------
 const PIN = new Path2D('M120 186 C 92 146, 64 120, 64 88 A 56 56 0 0 1 176 88 C 176 120, 148 146, 120 186 Z');
