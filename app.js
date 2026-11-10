@@ -171,11 +171,39 @@ function loadVoices(){
 }
 if(synth){ loadVoices(); synth.onvoiceschanged = loadVoices; }
 $('hoh').checked = store.get('cdj_hoh',false); document.body.classList.toggle('hoh',$('hoh').checked);
-$('hoh').onchange = ()=>{ document.body.classList.toggle('hoh',$('hoh').checked); store.set('cdj_hoh',$('hoh').checked); if($('hoh').checked && synth) synth.cancel(); if(current){ current.token=Math.random(); speakNext(); } };
+$('hoh').onchange = ()=>{ document.body.classList.toggle('hoh',$('hoh').checked); store.set('cdj_hoh',$('hoh').checked); if($('hoh').checked) hush(); if(current){ current.token=Math.random(); speakNext(); } };
 $('voice').onchange = ()=>store.set('cdj_voice',$('voice').value);
 $('rate').oninput = ()=>{ $('rateVal').textContent=(+$('rate').value).toFixed(2); store.set('cdj_rate',$('rate').value); };
+$('premium').checked = store.get('rhrn_premium', true); $('premium').onchange=()=>{ store.set('rhrn_premium',$('premium').checked); if(!$('premium').checked) try{ AUD.pause(); }catch(e){} };
 $('rate').value = store.get('cdj_rate','1'); $('rateVal').textContent=(+$('rate').value).toFixed(2);
 
+// ---------- premium voice (ElevenLabs via the tour-tts function), phone voice as fallback ----------
+const AUD = new Audio(); AUD.preload='auto';
+const TTS_KEY = 'rhrn_tts_urls';
+let ttsUrls = {}; try{ ttsUrls = JSON.parse(localStorage.getItem(TTS_KEY)||'{}'); }catch(e){}
+let ttsOff = false;                       // set when the server says premium voice isn't configured
+const ttsPending = {};
+function premiumOn(){ return $('premium') && $('premium').checked && !ttsOff && !document.body.classList.contains('hoh'); }
+function ttsKey(text){ let h=0; for(let i=0;i<text.length;i++){ h=((h<<5)-h+text.charCodeAt(i))|0; } return (h>>>0).toString(36)+'_'+text.length; }
+function saveTtsUrls(){ try{ const k=Object.keys(ttsUrls); if(k.length>3000) k.slice(0,k.length-3000).forEach(x=>delete ttsUrls[x]); localStorage.setItem(TTS_KEY, JSON.stringify(ttsUrls)); }catch(e){} }
+function ttsUrl(text, prev, next){
+  const k=ttsKey(text); if(ttsUrls[k]) return Promise.resolve(ttsUrls[k]);
+  if(!navigator.onLine || ttsOff) return Promise.resolve(null);
+  if(ttsPending[k]) return ttsPending[k];
+  ttsPending[k] = fetch(`${SB}/functions/v1/tour-tts`, {method:'POST', headers:{apikey:SBK, Authorization:'Bearer '+SBK, 'Content-Type':'application/json'},
+      body:JSON.stringify({text, prev:prev||'', next:next||''})})
+    .then(r=>r.json().then(j=>({r,j}))).then(({r,j})=>{ if(j.error==='not_configured'){ ttsOff=true; premiumNote('Premium voice is not set up yet, using the phone voice.'); }
+      if(r.ok && j.url){ ttsUrls[k]=j.url; saveTtsUrls(); fetch(j.url).catch(()=>{}); return j.url; } return null; })
+    .catch(()=>null).finally(()=>{ delete ttsPending[k]; });
+  return ttsPending[k];
+}
+function premiumNote(t){ const n=$('premiumNote'); if(n) n.textContent=t; }
+const seqText = it => typeof it==='object' ? (it.t||'') : it;
+function prefetchSeq(seq, from){ if(!premiumOn() || !navigator.onLine) return;
+  const items=seq.map(seqText); let i=from||0;
+  const run=async()=>{ while(i<items.length){ const j=i++; if(items[j]) await ttsUrl(items[j], items[j-1], items[j+1]); } };
+  run(); run(); }
+function hush(){ if(synth) synth.cancel(); try{ AUD.pause(); }catch(e){} AUD.onended=AUD.onerror=null; }
 function speakNext(){
   if(!current || paused) return;
   if(current.idx >= current.sentences.length){ finishCurrent(); return; }
@@ -201,6 +229,23 @@ function speakNext(){
     qTimer = setTimeout(()=>{ if(!current||current.token!==myToken||paused) return; current.idx++; speakNext(); }, ms);
     return;
   }
+  if(premiumOn()){
+    const seq=current.sentences, i=current.idx;
+    let fellBack=false;
+    const phone=()=>{ if(fellBack||!current||current.token!==myToken||paused) return; fellBack=true; synth.cancel(); synth.speak(u); };
+    const timer=setTimeout(phone, 6000); // slow network: don't leave silence, fall back for this sentence
+    ttsUrl(text, seqText(seq[i-1]||''), seqText(seq[i+1]||'')).then(url=>{
+      clearTimeout(timer);
+      if(!current||current.token!==myToken||paused) return;
+      if(!url){ phone(); return; }
+      if(fellBack) return; // the phone voice already took this sentence
+      AUD.onended=()=>{ if(!current||current.token!==myToken||paused) return; current.idx++; speakNext(); };
+      AUD.onerror=()=>{ AUD.onended=AUD.onerror=null; phone(); };
+      AUD.src=url; AUD.playbackRate=+$('rate').value; current.audioIdx=i;
+      AUD.play().catch(()=>{ AUD.onended=AUD.onerror=null; phone(); });
+    });
+    return;
+  }
   synth.speak(u);
 }
 function buildSeq(id, stop){ const seq = splitSentences(stop.text);
@@ -211,9 +256,10 @@ function saveState(){ store.set(SK+'state',{ started, paused, queue, cur: curren
 function startStop(id){
   const stop = findAny(id); if(!stop) return;
   lastActivity=Date.now();
-  synth && synth.cancel();
+  hush();
   paused=false;
-  current = { stop, sentences: buildSeq(id, stop), idx:0, token:Math.random() };
+  current = { stop, sentences: buildSeq(id, stop), idx:0, token:Math.random(), audioIdx:-1 };
+  prefetchSeq(current.sentences, 0);
   showScene(id); quizUI('hide'); showLook(id);
   played.add(id); store.set(SK+'played',[...played]);
   $('nowTitle').textContent = '🔊 '+stop.name; $('pauseBtn').textContent='Pause';
@@ -237,12 +283,14 @@ function enqueue(id){
   if(!current) startStop(id); else queue.push(id);
 }
 function togglePause(){ if(!current) return; unlockAudio();
-  if(!paused){ paused=true; clearTimeout(qTimer); synth && synth.cancel(); $('pauseBtn').textContent='Resume'; }
-  else { paused=false; $('pauseBtn').textContent='Pause'; current.token=Math.random(); speakNext(); }
+  if(!paused){ paused=true; clearTimeout(qTimer); synth && synth.cancel(); try{ AUD.pause(); }catch(e){} $('pauseBtn').textContent='Resume'; }
+  else { paused=false; $('pauseBtn').textContent='Pause';
+    if(current.audioIdx===current.idx && AUD.src && !AUD.ended && AUD.currentTime>0 && premiumOn()){ const tok=current.token; AUD.play().catch(()=>{ current.token=Math.random(); speakNext(); }); }
+    else { current.token=Math.random(); speakNext(); } }
   syncPause(); }
 function estSec(it){ if(typeof it==='object'){ if(it.pause) return it.pause; it=it.t; } return Math.max(1.5, (it||'').length*0.065/(+$('rate').value||1)); }
 function rewind(){ if(!current) return;
-  clearTimeout(qTimer); synth && synth.cancel();
+  clearTimeout(qTimer); hush(); current.audioIdx=-1;
   let i=current.idx, acc=0; // restart current sentence, then step back until ~10s covered
   while(i>0 && acc<10){ i--; acc+=estSec(current.sentences[i]); }
   current.idx=i; current.token=Math.random();
@@ -252,9 +300,9 @@ $('rewBtn').onclick=rewind;
 function syncPause(){ const f=$('fabPause'); f.style.display=current?'':'none'; $('fabRew').style.display=current?'':'none'; $('rewBtn').disabled=!current; f.textContent=paused?'▶ Resume':'⏸ Pause'; f.classList.toggle('resume',paused); }
 $('pauseBtn').onclick=togglePause; $('fabPause').onclick=togglePause; $('fabRew').onclick=rewind;
 $('stopBtn').onclick = ()=>confirmTap('stop','Stop?',doStop,()=>armBtn($('stopBtn'),'stop','Stop?','Stop'));
-function doStop(){ queue=[]; synth && synth.cancel(); current=null; paused=false; finishCurrent(); }
+function doStop(){ queue=[]; hush(); current=null; paused=false; finishCurrent(); }
 $('skipBtn').onclick = ()=>confirmTap('skip','Skip?',doSkip,()=>armBtn($('skipBtn'),'skip','Skip?','Skip ▸'));
-function doSkip(){ synth && synth.cancel(); current=null; paused=false; finishCurrent(); };
+function doSkip(){ hush(); current=null; paused=false; finishCurrent(); };
 $('testVoice').onclick = ()=>{ unlockAudio(); synth.cancel(); const u=new SpeechSynthesisUtterance(T.testPhrase||('Welcome to '+T.title+'.')); const v=voices.find(v=>v.name===$('voice').value); if(v){u.voice=v;u.lang=v.lang;} u.rate=+$('rate').value; synth.speak(u); };
 $('resetPlayed').onclick = ()=>{ played=new Set(); store.set(SK+'played',[]); renderStops(); drawMap(); };
 
@@ -528,8 +576,17 @@ function localAnswer(q){
 function sayAnswer(text){
   if(!text) return;
   if(current && !paused) togglePause();
-  if(document.body.classList.contains('hoh') || !synth) return;
-  synth.cancel(); const u=new SpeechSynthesisUtterance(text); const v=voices.find(v=>v.name===$('voice').value); if(v){u.voice=v;u.lang=v.lang;} u.rate=+$('rate').value; synth.speak(u);
+  sayText(text);
+}
+function sayText(text, onend){
+  if(document.body.classList.contains('hoh') || !synth){ onend && setTimeout(onend,300); return; }
+  hush();
+  const phone=()=>{ synth.cancel(); const u=new SpeechSynthesisUtterance(text); const v=voices.find(v=>v.name===$('voice').value); if(v){u.voice=v;u.lang=v.lang;} u.rate=+$('rate').value; if(onend){ u.onend=onend; u.onerror=onend; } synth.speak(u); };
+  if(!premiumOn() || text.length>2400){ phone(); return; }
+  const my=Math.random(); sayText.tok=my;
+  ttsUrl(text).then(url=>{ if(sayText.tok!==my) return; if(!url){ phone(); return; }
+    AUD.onended=()=>{ AUD.onended=null; onend&&onend(); }; AUD.onerror=()=>{ AUD.onerror=null; phone(); };
+    AUD.src=url; AUD.playbackRate=+$('rate').value; AUD.play().catch(phone); });
 }
 let askHist=[]; try{ askHist=JSON.parse(sessionStorage.getItem(SK+'askhist')||'[]'); }catch(e){}
 function tourOverview(){

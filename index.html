@@ -198,7 +198,12 @@
       <label style="flex:1"><b style="color:var(--ink)">Hard-of-hearing mode</b><br>Extra-large captions, no sound, vibrates at each new stop</label>
       <input type="checkbox" id="hoh" style="width:22px;height:22px">
     </div>
-    <div id="voiceWrap"><label for="voice">Voice</label>
+    <div class="row" style="justify-content:space-between;margin-bottom:8px">
+      <label style="flex:1"><b style="color:var(--ink)">Premium voice</b><br>Natural narrator voice when you have signal; switches to the phone voice offline. Stops already heard replay offline.</label>
+      <input type="checkbox" id="premium" style="width:22px;height:22px">
+    </div>
+    <div class="status" id="premiumNote" style="margin:-4px 0 8px"></div>
+    <div id="voiceWrap"><label for="voice">Phone voice (offline)</label>
     <select id="voice"></select></div>
     <label for="rate" style="display:block;margin-top:8px">Speed: <span id="rateVal">1.0</span>×</label>
     <input type="range" id="rate" min="0.7" max="1.4" step="0.05" value="1">
@@ -276,7 +281,7 @@
   <label>Who's coming? (kids, diet, mobility)</label><input class="inp" id="cGroup" placeholder="e.g. 2 adults, one prefers low saturated fat food">
   <label>Anything else?</label><textarea id="cMore" rows="2" placeholder="e.g. end at a good café, avoid steep hills"></textarea>
   <div class="row"><button class="secondary" id="cMic">🎤 Speak</button><button id="cGo" style="flex:1">Create tour</button></div>
-  <div class="status" id="cStatus">Claude writes the stops, the narration and the GPS points. Needs signal; afterwards the tour works offline.</div>
+  <div class="status" id="cStatus">Claude researches the places and writes dense narration: history, stories, what to look for. Needs signal; afterwards the tour works offline.</div>
 </div></div>
 <div class="toast" id="toast"></div>
 <div class="viewer" id="viewer"><img id="viewImg" alt="" crossorigin="anonymous">

@@ -10,11 +10,7 @@ async function fn(body, ms){
   finally{ clearTimeout(t); }
 }
 const slugify = s => (s||'tour').normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'').slice(0,40) || 'tour';
-function speak(text, onend){
-  if(!text || document.body.classList.contains('hoh') || !synth){ onend && setTimeout(onend, 300); return; }
-  synth.cancel(); const u = new SpeechSynthesisUtterance(text); const v = voices.find(v=>v.name===$('voice').value); if(v){ u.voice=v; u.lang=v.lang; } u.rate = +$('rate').value;
-  if(onend){ u.onend = onend; u.onerror = onend; } synth.speak(u);
-}
+function speak(text, onend){ if(!text){ onend && setTimeout(onend,300); return; } sayText(text, onend); }
 
 // ---------- header + tour bar ----------
 document.title = 'Right Here, Right Now · ' + T.title;
@@ -83,16 +79,31 @@ $('cGo').onclick = async ()=>{
   const where=$('cWhere').value.trim(); if(!where){ $('cStatus').innerHTML='<span class="bad">Tell me where the tour is.</span>'; return; }
   if(!navigator.onLine){ $('cStatus').innerHTML='<span class="bad">Creating a tour needs signal.</span>'; return; }
   store.set('rhrn_c_where',where); store.set('rhrn_c_start',$('cStart').value); store.set('rhrn_c_group',$('cGroup').value);
-  $('cGo').disabled=true; let secs=0; const tick=setInterval(()=>{ secs++; $('cStatus').textContent=`Claude is researching and writing your tour… ${secs}s (usually 1 to 2 minutes). Keep this screen open.`; },1000);
+  $('cGo').disabled=true; const t0=Date.now(); let stage='Claude is researching places and planning the route';
+  const show=()=>{ $('cStatus').textContent=`${stage}… ${Math.round((Date.now()-t0)/1000)}s. Usually 2 to 3 minutes; keep this screen open.`; };
+  const tick=setInterval(show,1000); show();
+  const form={where, start:$('cStart').value.trim(), length:pickState.len, transport:pickState.mode, pace:pickState.pace,
+    interests:[...pickState.likes], group:$('cGroup').value.trim(), more:$('cMore').value.trim(), lat:lastFix?lastFix.lat:null, lng:lastFix?lastFix.lng:null,
+    local:new Date().toString().slice(0,24)};
   try{
-    const {ok,j} = await fn({mode:'create', where, start:$('cStart').value.trim(), length:pickState.len, transport:pickState.mode, pace:pickState.pace,
-      interests:[...pickState.likes], group:$('cGroup').value.trim(), more:$('cMore').value.trim(), lat:lastFix?lastFix.lat:null, lng:lastFix?lastFix.lng:null,
-      local:new Date().toString().slice(0,24)}, 175000);
-    if(!ok || !j.tour) throw new Error(j.detail||j.error||'no tour returned');
-    store.set('rhrn_tourdata_'+j.tour.id, j.tour); rememberTour(j.tour);
-    $('cStatus').innerHTML=`<span class="ok">Done: ${esc(j.tour.title)}.</span> Opening…`;
-    setTimeout(()=>switchTour(j.tour.id), 700);
-  }catch(e){ $('cStatus').innerHTML='<span class="bad">Could not create the tour: '+esc(e.name==='AbortError'?'it took too long, try a shorter tour':e.message).slice(0,200)+'</span>'; }
+    const o = await fn(Object.assign({mode:'create_outline'}, form), 150000);
+    if(!o.ok || !o.j.outline) throw new Error(o.j.detail||o.j.error||'could not plan the route');
+    const {outline, ctx, jobs} = o.j;
+    stage=`Writing the stories for ${outline.stops.length} places and ${outline.story_topics.length} travel stories (0/${jobs.length})`;
+    const geoP = fn({mode:'create_geocode', items:outline.stops, city:outline.city}, 120000).then(r=>r.ok?r.j.items:[]).catch(()=>[]);
+    const texts={}; let done=0; const batches=[]; for(let i=0;i<jobs.length;i+=3) batches.push(jobs.slice(i,i+3));
+    let next=0; await Promise.all(Array.from({length:Math.min(5,batches.length)}, async()=>{ while(next<batches.length){ const bt=batches[next++];
+      for(let attempt=0; attempt<2; attempt++){ try{ const r=await fn({mode:'create_narrate', ctx, jobs:bt}, 120000); if(r.ok){ Object.assign(texts, r.j.texts||{}); break; } }catch(e){} }
+      done+=bt.length; stage=stage.replace(/\(\d+\/\d+\)/, `(${done}/${jobs.length})`); } }));
+    stage='Placing everything on the map'; const geo=await geoP;
+    stage='Saving the tour';
+    const s2 = await fn({mode:'create_assemble', outline, texts, geo, where, group:form.group}, 60000);
+    if(!s2.ok || !s2.j.tour) throw new Error(s2.j.detail||s2.j.error||'could not save');
+    const tour=s2.j.tour;
+    store.set('rhrn_tourdata_'+tour.id, tour); rememberTour(tour);
+    $('cStatus').innerHTML=`<span class="ok">Done: ${esc(tour.title)}, ${tour.stops.length} places and ${(tour.fillers.length+tour.walkStories.length)} stories.</span> Opening…`;
+    setTimeout(()=>switchTour(tour.id), 900);
+  }catch(e){ $('cStatus').innerHTML='<span class="bad">Could not create the tour: '+esc(e.name==='AbortError'?'it took too long; try again or pick a shorter tour':e.message).slice(0,200)+'</span>'; }
   finally{ clearInterval(tick); $('cGo').disabled=false; }
 };
 

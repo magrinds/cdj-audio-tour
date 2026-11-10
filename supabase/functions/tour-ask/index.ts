@@ -2,7 +2,7 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 
 // Right Here, Right Now: one function for the guide.
 //   mode "ask" (default): answer a question (with web search), or propose a new plan via the update_plan tool
-//   mode "create": write a whole new tour, geocode it, save it to rhrn_tours
+//   modes "create_outline" / "create_narrate" / "create_geocode" / "create_assemble": build a new tour in steps, save to rhrn_tours
 //   mode "save_plan": store the group's current plan in rhrn_tour_plans
 
 const cors = {
@@ -73,28 +73,33 @@ const UPDATE_PLAN_TOOL = {
   },
 };
 
-const CREATE_SYSTEM = `You design self-guided GPS audio tours for the "Right Here, Right Now" app. Each stop's narration plays automatically when the guests reach it.
-${VOICE}
+const CREATE_SYSTEM = `You plan dense, story-rich self-guided GPS audio tours for the "Right Here, Right Now" app. Narration plays automatically as guests reach or pass each point. The best tours feel like a brilliant local friend who never runs out of stories: history, people, politics, industry, food, architecture, scandals, legends, funny anecdotes, and what to look at right now.
+You are writing the OUTLINE. Separate writers will turn each item into narration, so make every angle specific and different (names, dates, stories to tell), with no overlap between items.
 Rules:
-- The first stop is the starting point (their hotel or address if given, otherwise a natural meeting point). It plays when they tap Start: welcome them, set the scene for this place, and preview the route.
-- Then the stops, in an efficient walking or riding order that fits the time. About 3 to 4 stops for 1 hour, 5 to 6 for 2 hours, 6 to 8 for 3 hours or more. Include snack or café stops when they like food.
-- Only real places you are confident exist, with your best coordinates and a precise place_query (name, street, neighborhood, city) for a geocoder.
-- Each stop's narration: 120 to 200 words. Mix history, local stories, people, food, culture and one thing to look for. Respect the group notes (kids, diet, mobility). End the last stop with a short goodbye.
-- Add 3 or 4 standalone stories (80 to 140 words each) about the city and its culture, to play while traveling between stops.
-- Add a quiz question to 2 or 3 stops.
+- The first stop is the starting point (their hotel or address if given, otherwise a natural meeting point), arrive "start". Its narration welcomes them, sets the scene and previews the route.
+- Main stops (arrive "walk" or "ride"), in an efficient order that fits the time: about 4 for 1 hour, 5 to 6 for 2 hours, 7 to 8 for 3 hours or more. Include snack or cafe stops when they like food, and respect the group notes (kids, diet, mobility).
+- Also add pass-by points (arrive "pass"): interesting streets, buildings, viewpoints or neighborhoods along the way between stops that get a short story as the guests go by. Add 1 or 2 between most pairs of stops.
+- Use web_search to confirm places exist, find their exact location, check opening hours for the day, and find good local stories. Search in the local language when helpful. Keep searching efficient.
+- Coordinates: your best latitude and longitude plus a precise place_query (name, street, neighborhood, city) for a geocoder.
+- story_topics: 10 to 12 standalone stories about this city, its region, culture, food, people and history, to fill travel time. kind "walk" for on-foot moments (street life, signs, customs) or "ride" for longer stories.
+- Add a quiz question to 3 or 4 stops.
 - trip: one short paragraph of facts the guide should remember later (start point, group, transport, length, preferences).`;
 
-const CREATE_TOOL = {
-  name: "create_tour",
-  description: "Return the finished tour.",
+const NARRATOR = `You are the narrator of a self-guided GPS audio tour in the "Right Here, Right Now" app. Write the narration for ONE item of the tour.
+${VOICE}
+Make it dense and specific like the best human guides: concrete names, dates and numbers, vivid stories, local legends, politics and economics where relevant, food, and at least one thing to look at right now. Use humor where it fits. Speak directly to the guests ("look to your left", "you are standing where..."). Short paragraphs separated by line breaks. Respect the group notes. Do not repeat what other items cover (see the outline). Only state facts you are confident about; skip a detail rather than invent it. Output only the narration text.`;
+
+const OUTLINE_TOOL = {
+  name: "tour_outline",
+  description: "Return the tour outline.",
   input_schema: {
     type: "object",
     properties: {
-      title: { type: "string", description: "Short tour title, usually the place name, e.g. 'Jardins, São Paulo'." },
+      title: { type: "string", description: "Short tour title, usually the place name." },
       city: { type: "string", description: "City, state or region, country." },
-      tz: { type: "string", description: "IANA time zone, e.g. America/Sao_Paulo." },
+      tz: { type: "string", description: "IANA time zone." },
       mode: { type: "string", enum: ["walk", "walk_ride", "car"] },
-      blurb: { type: "string", description: "One line describing the tour, under 150 characters." },
+      blurb: { type: "string", description: "One line, under 150 characters." },
       trip: { type: "string" },
       stops: {
         type: "array",
@@ -104,35 +109,37 @@ const CREATE_TOOL = {
             name: { type: "string" },
             place_query: { type: "string" },
             lat: { type: "number" }, lng: { type: "number" },
-            arrive: { type: "string", enum: ["start", "walk", "ride"] },
-            look: { type: "string" },
-            note: { type: "string" },
-            narration: { type: "string" },
-            quiz_question: { type: "string" },
-            quiz_answer: { type: "string" },
+            arrive: { type: "string", enum: ["start", "walk", "ride", "pass"] },
+            angle: { type: "string", description: "What this item's narration should cover: specific stories, people, dates, things to look at." },
+            look: { type: "string", description: "Short 'what to look for' line." },
+            note: { type: "string", description: "Practical note: hours, price level, tips." },
+            quiz_question: { type: "string" }, quiz_answer: { type: "string" },
           },
-          required: ["name", "place_query", "lat", "lng", "arrive", "narration"],
+          required: ["name", "place_query", "lat", "lng", "arrive", "angle"],
         },
       },
-      stories: {
+      story_topics: {
         type: "array",
-        items: { type: "object", properties: { name: { type: "string" }, narration: { type: "string" } }, required: ["name", "narration"] },
+        items: { type: "object", properties: { name: { type: "string" }, angle: { type: "string" }, kind: { type: "string", enum: ["walk", "ride"] } }, required: ["name", "angle", "kind"] },
       },
     },
-    required: ["title", "city", "tz", "mode", "blurb", "trip", "stops", "stories"],
+    required: ["title", "city", "tz", "mode", "blurb", "trip", "stops", "story_topics"],
   },
 };
 
 const WEB_SEARCH = { type: "web_search_20250305", name: "web_search", max_uses: 3 };
+function send(key: string, model: string, body: Record<string, unknown>) {
+  return fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: { "x-api-key": key, "anthropic-version": "2023-06-01", "content-type": "application/json" },
+    body: JSON.stringify({ model, ...body }),
+  });
+}
 async function claude(key: string, body: Record<string, unknown>) {
   let last: any = null;
   for (const model of [MODEL, FALLBACK]) {
-    const r = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: { "x-api-key": key, "anthropic-version": "2023-06-01", "content-type": "application/json" },
-      body: JSON.stringify({ model, ...body }),
-    });
-    const j = await r.json().catch(() => ({}));
+    let r = await send(key, model, body), j = await r.json().catch(() => ({}));
+    if (r.status === 429 || r.status === 529) { await sleep(4000); r = await send(key, model, body); j = await r.json().catch(() => ({})); }
     if (r.ok) { console.log("ok", model, j.stop_reason, JSON.stringify(j.usage || {})); return { ok: true, j, model }; }
     last = { status: r.status, type: j?.error?.type, detail: j?.error?.message || JSON.stringify(j).slice(0, 300), model };
     console.error("anthropic error", JSON.stringify(last));
@@ -140,11 +147,7 @@ async function claude(key: string, body: Record<string, unknown>) {
       // web search not enabled for this org: retry once without it
       const tools = (body.tools as any[]).filter((t) => t.name !== "web_search");
       body = { ...body, tools: tools.length ? tools : undefined };
-      const r2 = await fetch("https://api.anthropic.com/v1/messages", {
-        method: "POST",
-        headers: { "x-api-key": key, "anthropic-version": "2023-06-01", "content-type": "application/json" },
-        body: JSON.stringify({ model, ...body }),
-      });
+      const r2 = await send(key, model, body);
       const j2 = await r2.json().catch(() => ({}));
       if (r2.ok) { console.log("ok without web search", model); return { ok: true, j: j2, model, noSearch: true }; }
     }
@@ -249,11 +252,13 @@ async function doAsk(key: string, body: any) {
   return json({ answer: text, model: res.model, searched, noSearch: !!res.noSearch });
 }
 
-async function doCreate(key: string, body: any) {
-  const where = S(body.where, 200).trim();
-  if (!where) return json({ error: "where" }, 400);
-  const brief = [
-    `Where: ${where}`,
+const WORDS: Record<string, string> = { start: "220 to 320", walk: "230 to 350", ride: "230 to 350", pass: "110 to 180" };
+
+// Tour creation runs as several short calls driven by the app, so no single call hits the time limit:
+// outline -> (narrate batches + geocode, in parallel) -> assemble
+function briefOf(body: any) {
+  return [
+    `Where: ${S(body.where, 200)}`,
     body.start ? `Starting point: ${S(body.start, 200)}` : "Starting point: not given, choose one",
     `Length: ${S(body.length, 30)}`, `Getting around: ${S(body.transport, 30)}`, `Pace: ${S(body.pace, 30)}`,
     `Interests: ${(Array.isArray(body.interests) ? body.interests : []).map((x: unknown) => S(x, 40)).join(", ")}`,
@@ -262,43 +267,102 @@ async function doCreate(key: string, body: any) {
     body.lat != null ? `Their phone is currently at ${Number(body.lat).toFixed(4)}, ${Number(body.lng).toFixed(4)}` : "",
     body.local ? `Their local date and time: ${S(body.local, 40)}` : "",
   ].filter(Boolean).join("\n");
+}
+
+async function doOutline(key: string, body: any) {
+  const where = S(body.where, 200).trim();
+  if (!where) return json({ error: "where" }, 400);
+  const brief = briefOf(body);
+  const t0 = Date.now();
   const res = await claude(key, {
-    max_tokens: 12000, system: CREATE_SYSTEM,
-    messages: [{ role: "user", content: `Create the tour.\n${brief}` }],
-    tools: [CREATE_TOOL], tool_choice: { type: "tool", name: "create_tour" },
+    max_tokens: 6000, system: CREATE_SYSTEM,
+    messages: [{ role: "user", content: `Plan the tour outline, then call tour_outline.\n${brief}` }],
+    tools: [{ ...WEB_SEARCH, max_uses: 4 }, OUTLINE_TOOL],
   });
   if (!res.ok) return json({ error: "llm", ...res.last }, 502);
-  const tool = (res.j.content || []).find((c: any) => c.type === "tool_use");
-  if (!tool) return json({ error: "llm", detail: "no tour returned, stop_reason " + res.j.stop_reason }, 502);
+  let tool = (res.j.content || []).find((c: any) => c.type === "tool_use" && c.name === "tour_outline");
+  if (!tool) {
+    const r2 = await claude(key, {
+      max_tokens: 5000, system: CREATE_SYSTEM,
+      messages: [{ role: "user", content: `Plan the tour outline.\n${brief}` }],
+      tools: [OUTLINE_TOOL], tool_choice: { type: "tool", name: "tour_outline" },
+    });
+    if (!r2.ok) return json({ error: "llm", ...r2.last }, 502);
+    tool = (r2.j.content || []).find((c: any) => c.type === "tool_use");
+    if (!tool) return json({ error: "llm", detail: "no outline returned" }, 502);
+  }
   const t = tool.input || {};
-  const raw = (Array.isArray(t.stops) ? t.stops : []).filter((s: any) => s && s.name && s.narration).slice(0, 12);
-  if (raw.length < 2) return json({ error: "llm", detail: "tour too short" }, 502);
-  await fixCoords(raw, S(t.city, 120) || where);
-  const id = `${slug(S(t.title, 60) || where)}-${Math.random().toString(36).slice(2, 6)}`;
+  const stops = (Array.isArray(t.stops) ? t.stops : []).filter((s: any) => s && s.name && Number.isFinite(+s.lat) && Number.isFinite(+s.lng)).slice(0, 22);
+  if (stops.length < 2) return json({ error: "llm", detail: "tour too short" }, 502);
+  stops[0].arrive = "start";
+  const topics = (Array.isArray(t.story_topics) ? t.story_topics : []).filter((x: any) => x && x.name).slice(0, 12);
+  const city = S(t.city, 120) || where;
+  const outlineText = stops.map((s: any, i: number) => `${i + 1}. ${s.name} [${s.arrive}]: ${S(s.angle, 400)}`).join("\n")
+    + "\nTravel stories:\n" + topics.map((x: any) => `- ${x.name}: ${S(x.angle, 300)}`).join("\n");
+  const ctx = `TOUR: ${S(t.title, 80)} in ${city}\nTRIP: ${S(t.trip, 800)}\nGROUP NOTES: ${S(body.group, 300) || "none"}\nOUTLINE:\n${outlineText}`;
+  const jobs = [
+    ...stops.map((s: any, i: number) => ({ key: "stop" + i, words: WORDS[s.arrive] || WORDS.walk,
+      prompt: `Write the narration for item ${i + 1}: ${s.name} (${s.arrive === "pass" ? "a pass-by point, heard while going past" : s.arrive === "start" ? "the starting point, heard when they tap Start" : "a main stop, heard on arrival"}).\nAngle: ${S(s.angle, 600)}\n${s.look ? "Look for: " + S(s.look, 200) + "\n" : ""}${i + 1 < stops.length ? "Next item: " + stops[i + 1].name + "\n" : "This is the last item: end with a warm goodbye.\n"}` })),
+    ...topics.map((x: any, i: number) => ({ key: "story" + i, words: "100 to 170",
+      prompt: `Write a standalone travel story titled "${S(x.name, 80)}" to play while the guests ${x.kind === "walk" ? "walk" : "ride"} between stops.\nAngle: ${S(x.angle, 500)}\n` })),
+  ];
+  console.log("outline", Math.round((Date.now() - t0) / 1000) + "s", stops.length, "items", topics.length, "stories");
+  return json({ outline: { ...t, city, stops, story_topics: topics }, ctx, jobs, model: res.model });
+}
+
+async function doNarrate(key: string, body: any) {
+  const ctx = S(body.ctx, 12000);
+  const jobs = (Array.isArray(body.jobs) ? body.jobs : []).slice(0, 6);
+  const texts: Record<string, string> = {};
+  await Promise.all(jobs.map(async (job: any) => {
+    const r = await claude(key, { max_tokens: 1500, system: NARRATOR + "\n\n" + ctx, messages: [{ role: "user", content: `${S(job.prompt, 1500)}Length: ${S(job.words, 20)} words.` }] });
+    if (r.ok) texts[S(job.key, 20)] = (r.j.content || []).filter((c: any) => c.type === "text").map((c: any) => c.text).join("").trim();
+  }));
+  return json({ texts });
+}
+
+async function doGeocode(body: any) {
+  const items = (Array.isArray(body.items) ? body.items : []).slice(0, 22).map((x: any) => ({ name: S(x.name, 100), place_query: S(x.place_query, 200), lat: +x.lat, lng: +x.lng }));
+  await fixCoords(items, S(body.city, 120));
+  return json({ items: items.map((x: any) => ({ lat: x.lat, lng: x.lng, approx: !!x.approx })) });
+}
+
+async function doAssemble(body: any) {
+  const t = body.outline || {};
+  const texts = body.texts || {};
+  const geo = Array.isArray(body.geo) ? body.geo : [];
+  const raw = Array.isArray(t.stops) ? t.stops.slice(0, 22) : [];
+  const topics = Array.isArray(t.story_topics) ? t.story_topics.slice(0, 12) : [];
+  const where = S(body.where, 200);
+  const id = `${slug(S(t.title, 60) || where || "tour")}-${Math.random().toString(36).slice(2, 6)}`;
   const quiz: Record<string, unknown> = {};
   const stops = raw.map((s: any, i: number) => {
     const sid = "s" + (i + 1);
     if (s.quiz_question && s.quiz_answer) quiz[sid] = { ask: S(s.quiz_question, 200), ans: S(s.quiz_answer, 200) };
-    const start = i === 0;
-    const ride = s.arrive === "ride";
+    const start = i === 0, ride = s.arrive === "ride", pass = s.arrive === "pass";
+    const g = geo[i] || {};
     return {
-      id: sid, name: S(s.name, 80), lat: +s.lat, lng: +s.lng, radius: start ? 0 : ride ? 200 : 80, walk: !start && !ride,
-      text: S(s.narration, 3000), look: s.look ? S(s.look, 140) : "", note: s.note ? S(s.note, 140) : "",
-      approx: !!s.approx, mapLabel: start ? "Start" : "", photoQ: `${S(s.name, 80)} ${S(t.city, 60)}`,
+      id: sid, name: S(s.name, 80) + (pass ? " (passing)" : ""), lat: Number.isFinite(+g.lat) ? +g.lat : +s.lat, lng: Number.isFinite(+g.lng) ? +g.lng : +s.lng,
+      radius: start ? 0 : pass ? 180 : ride ? 200 : 80, walk: !start && !ride && !pass,
+      text: S(texts["stop" + i] || s.angle, 4000), look: s.look ? S(s.look, 140) : "", note: s.note ? S(s.note, 140) : "",
+      approx: !!g.approx, mapLabel: start ? "Start" : "", photoQ: `${S(s.name, 80)} ${S(t.city, 60)}`,
     };
-  });
-  const stories = (Array.isArray(t.stories) ? t.stories : []).filter((s: any) => s && s.narration).slice(0, 6)
-    .map((s: any, i: number) => ({ id: "f" + (i + 1), name: "Story: " + S(s.name, 80), text: S(s.narration, 2000) }));
+  }).filter((s: any) => Number.isFinite(s.lat) && Number.isFinite(s.lng) && s.text);
+  if (stops.length < 2) return json({ error: "assemble", detail: "tour too short" }, 400);
+  const stories = topics.map((x: any, i: number) => ({ id: "f" + (i + 1), kind: x.kind, name: "Story: " + S(x.name, 80), text: S(texts["story" + i], 2500) })).filter((x: any) => x.text);
   const mode = ["walk", "walk_ride", "car"].includes(t.mode) ? t.mode : "walk_ride";
+  const strip = (x: any) => ({ id: x.id, name: x.name, text: x.text });
   const tour = {
     id, title: S(t.title, 80) || where, city: S(t.city, 160) || where, tz: S(t.tz, 60) || undefined, mode,
     blurb: S(t.blurb, 160), trip: S(t.trip, 1500), guestNotes: S(body.group, 300),
     startId: "s1", stops, quiz,
-    fillers: mode === "walk" ? [] : stories, walkStories: mode === "walk" ? stories : [],
-    createdWith: res.model, createdAt: new Date().toISOString(),
+    fillers: (mode === "walk" ? [] : stories.filter((x: any) => x.kind !== "walk")).map(strip),
+    walkStories: (mode === "walk" ? stories : stories.filter((x: any) => x.kind === "walk")).map(strip),
+    createdAt: new Date().toISOString(),
   };
   const ins = await rest("rhrn_tours", "POST", { id, title: tour.title, city: tour.city, blurb: tour.blurb, data: tour });
   if (!ins.ok) console.error("save tour failed", ins.status, await ins.text());
+  console.log("assembled", id, stops.length, "stops", stories.length, "stories");
   return json({ tour, saved: ins.ok });
 }
 
@@ -322,7 +386,10 @@ Deno.serve(async (req: Request) => {
     if (body.mode === "save_plan") return await doSavePlan(body);
     const key = (Deno.env.get("ANTHROPIC_API_KEY_RHRN") || "").trim();
     if (!key) return json({ error: "not_configured" }, 503);
-    if (body.mode === "create") return await doCreate(key, body);
+    if (body.mode === "create_outline") return await doOutline(key, body);
+    if (body.mode === "create_narrate") return await doNarrate(key, body);
+    if (body.mode === "create_geocode") return await doGeocode(body);
+    if (body.mode === "create_assemble") return await doAssemble(body);
     return await doAsk(key, body);
   } catch (e) {
     console.error("handler error", String(e));
