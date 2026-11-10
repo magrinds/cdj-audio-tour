@@ -76,6 +76,8 @@
   .grid .pend { position:absolute; top:4px; left:4px; font-size:10px; background:var(--accent2); color:#fff; border-radius:6px; padding:1px 5px; }
   .viewer { position:fixed; inset:0; background:#000; z-index:40; display:none; align-items:center; justify-content:center; }
   .viewer.open { display:flex; } .viewer img { max-width:100%; max-height:100%; }
+  .vbar { position:absolute; left:0; right:0; bottom:24px; display:flex; gap:10px; justify-content:center; }
+  .vmsg { position:absolute; top:20px; left:0; right:0; text-align:center; color:#fff; font-size:13px; }
   main { padding-bottom:100px; }
 </style>
 </head>
@@ -156,7 +158,9 @@
   <div class="status" id="albumStatus">Loading…</div>
   <div class="grid" id="grid"></div>
 </div></div>
-<div class="viewer" id="viewer"><img id="viewImg" alt=""></div>
+<div class="viewer" id="viewer"><img id="viewImg" alt="" crossorigin="anonymous">
+  <div class="vbar"><button id="vShare">Share</button><button id="vSave" class="secondary">Save</button><button id="vClose" class="secondary">Close</button></div>
+  <div class="vmsg" id="vMsg"></div></div>
 <script>
 const STOPS = [
  { id:"drive1", name:"Drive up to Alto da Boa Vista", lat:-22.7194257, lng:-45.5611975, radius:0, walk:false, mapLabel:"Hotel",
@@ -578,10 +582,43 @@ async function openAlbum(){
     const j=await r.json(); if(Array.isArray(j)){ tiles=tiles.concat(j.filter(o=>o.name&&o.name.endsWith('.jpg')).map(o=>({src:`${SB}/storage/v1/object/public/${BUCKET}/${ALBUM}/${o.name}`, name:o.name}))); }
     $('albumStatus').textContent = tiles.length? `${tiles.length} photo${tiles.length===1?'':'s'} from the group`:'No photos yet. Tap 📷 to add the first!';
   }catch(e){ $('albumStatus').textContent = (tiles.length?'Showing photos on this phone. ':'')+'Offline: the shared album loads when you have signal.'; }
-  $('grid').innerHTML = tiles.map(t=>{ const parts=t.name.replace('.jpg','').split('__'); const who=(parts[1]||'').replace(/-/g,' '); return `<div><img loading="lazy" src="${t.src}" data-full="${t.src}">${t.pend?'<span class="pend">waiting</span>':''}<span class="tag">${who} · ${nice(parts[2])}</span></div>`; }).join('');
+  $('grid').innerHTML = tiles.map(t=>{ const parts=t.name.replace('.jpg','').split('__'); const who=(parts[1]||'').replace(/-/g,' '); return `<div><img loading="lazy" crossorigin="anonymous" src="${t.src}" data-full="${t.src}">${t.pend?'<span class="pend">waiting</span>':''}<span class="tag">${who} · ${nice(parts[2])}</span></div>`; }).join('');
   $('grid').querySelectorAll('img').forEach(i=>i.onclick=()=>{ $('viewImg').src=i.dataset.full; $('viewer').classList.add('open'); });
 }
-$('viewer').onclick=()=>$('viewer').classList.remove('open');
+
+// ---------- branded share ----------
+const PIN = new Path2D('M120 186 C 92 146, 64 120, 64 88 A 56 56 0 0 1 176 88 C 176 120, 148 146, 120 186 Z');
+async function brandedBlob(src){
+  const img = await new Promise((res,rej)=>{ const i=new Image(); i.crossOrigin='anonymous'; i.onload=()=>res(i); i.onerror=rej; i.src=src; });
+  const c=document.createElement('canvas'); c.width=img.naturalWidth; c.height=img.naturalHeight; const x=c.getContext('2d');
+  x.drawImage(img,0,0);
+  const u=Math.max(c.width,c.height)/1000; // scale unit
+  const f1=Math.round(26*u), f2=Math.round(17*u), pad=Math.round(16*u);
+  x.font=`700 ${f1}px -apple-system,Segoe UI,Roboto,sans-serif`; const t1='Campos do Jordão';
+  x.font=`600 ${f2}px -apple-system,Segoe UI,Roboto,sans-serif`; const t2='Right Here, Right Now';
+  x.font=`700 ${f1}px -apple-system,Segoe UI,Roboto,sans-serif`; const w1=x.measureText(t1).width;
+  x.font=`600 ${f2}px -apple-system,Segoe UI,Roboto,sans-serif`; const w2=x.measureText(t2).width;
+  const iconW=Math.round(34*u), bw=pad*3+iconW+Math.max(w1,w2), bh=pad*2+f1+f2+Math.round(4*u);
+  const bx=Math.round(22*u), by=c.height-bh-Math.round(22*u), r=bh/2;
+  x.fillStyle='rgba(11,42,91,.72)'; x.beginPath(); x.moveTo(bx+r,by); x.arcTo(bx+bw,by,bx+bw,by+bh,r); x.arcTo(bx+bw,by+bh,bx,by+bh,r); x.arcTo(bx,by+bh,bx,by,r); x.arcTo(bx,by,bx+bw,by,r); x.fill();
+  x.save(); const sc=iconW/120; x.translate(bx+pad-64*sc+Math.round(4*u), by+(bh-160*sc)/2-30*sc); x.scale(sc,sc); x.fillStyle='#fff'; x.fill(PIN); x.fillStyle='#1d4ed8'; x.beginPath(); x.arc(120,88,24,0,7); x.fill(); x.restore();
+  const tx=bx+pad*2+iconW;
+  x.fillStyle='#fff'; x.font=`700 ${f1}px -apple-system,Segoe UI,Roboto,sans-serif`; x.textBaseline='top'; x.fillText(t1,tx,by+pad);
+  x.fillStyle='#bfdbfe'; x.font=`600 ${f2}px -apple-system,Segoe UI,Roboto,sans-serif`; x.fillText(t2,tx,by+pad+f1+Math.round(4*u));
+  x.fillStyle='#f59e0b'; x.fillText('.', tx+w2+1, by+pad+f1+Math.round(4*u));
+  return await new Promise(r=>c.toBlob(r,'image/jpeg',0.9));
+}
+async function shareCurrent(save){
+  $('vMsg').textContent='Preparing…';
+  try{ const blob=await brandedBlob($('viewImg').src); const file=new File([blob],'campos-do-jordao.jpg',{type:'image/jpeg'});
+    if(!save && navigator.canShare && navigator.canShare({files:[file]})){ await navigator.share({files:[file], title:'Campos do Jordão', text:'📍 Campos do Jordão · Right Here, Right Now'}); $('vMsg').textContent=''; return; }
+    const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='campos-do-jordao.jpg'; document.body.appendChild(a); a.click(); a.remove(); $('vMsg').textContent='Saved to your downloads.';
+  }catch(e){ $('vMsg').textContent = (e && e.name==='AbortError') ? '' : 'Could not prepare this photo. Try again with signal.'; }
+}
+$('vShare').onclick=e=>{ e.stopPropagation(); shareCurrent(false); };
+$('vSave').onclick=e=>{ e.stopPropagation(); shareCurrent(true); };
+$('vClose').onclick=e=>{ e.stopPropagation(); $('viewer').classList.remove('open'); $('vMsg').textContent=''; };
+
 $('fab').onclick=()=>{ $('who').value=store.get('cdj_who',''); $('addSheet').classList.add('open'); };
 $('albumBtn').onclick=openAlbum;
 document.querySelectorAll('[data-close]').forEach(b=>b.onclick=()=>$(b.dataset.close).classList.remove('open'));
