@@ -923,14 +923,16 @@ function nearestStopInfo(){
 function localAnswer(q){
   const norm=s=>s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'');
   const stop=new Set(['what','where','when','which','with','that','this','there','about','tell','from','have','does','they','their','here','were','would','could','should','long','many','much','some']);
-  const words=[...new Set(norm(q).split(/[^a-z0-9]+/).filter(w=>w.length>3 && !stop.has(w)))];
+  const syn={statue:'sculpt',statues:'sculpt',sculptures:'sculpt',sculpture:'sculpt',church:'igreja',train:'railway',food:'eat',snack:'eat'};
+  const words=[...new Set(norm(q).split(/[^a-z0-9]+/).filter(w=>w.length>3 && !stop.has(w)).map(w=>syn[w]||w))];
   if(!words.length) return '';
   const n=nearestStopInfo(); const pool=STOPS.concat(MUSEUM,WALKSTORIES,FILLERS);
   const sens=[]; for(const s of pool) for(const sen of splitSentences(s.text)) sens.push({id:s.id,sen,t:norm(sen)});
   const stem=w=>w.slice(0,Math.max(4,w.length-2)); const df={}; for(const w of words) df[w]=sens.filter(x=>x.t.includes(stem(w))).length||1;
-  const scored=sens.map(x=>{ let sc=0, hit=0; for(const w of words){ if(x.t.includes(stem(w))){ sc+=1/df[w]; hit++; } } sc+=hit*10;
+  const scored=sens.map(x=>{ let sc=0, hit=0; for(const w of words){ if(x.t.includes(stem(w))){ sc+=Math.min(9,1/df[w]); hit++; } } sc+=hit*10;
     if(sc && n && x.id===n.stop.id) sc*=1.4; if(sc && current && x.id===current.stop.id) sc*=1.4; return {sc,x}; }).filter(o=>o.sc>0);
-  scored.sort((a,b)=>b.sc-a.sc); if(!scored.length) return '';
+  const need=Math.max(1,Math.ceil(words.length*0.5));
+  scored.sort((a,b)=>b.sc-a.sc); if(!scored.length || Math.floor(scored[0].sc/10)<need) return '';
   const top=scored[0].x; const same=scored.filter(o=>o.x.id===top.id).slice(0,3).map(o=>o.x.sen);
   return same.join(' ');
 }
@@ -955,7 +957,7 @@ async function ask(){
       const j=await r.json(); if(r.ok && j.answer){ ans=j.answer; src='Claude'; } else if(j.error==='not_configured'){ src='notcfg'; } else { src='err'; errMsg=(j.detail||j.error||('HTTP '+r.status)); } }catch(e){ src='err'; errMsg=String(e); }
   }
   if(!ans){ ans=localAnswer(q); if(ans) ans=(src==='notcfg'?'':'')+ans; }
-  if(!ans) ans = navigator.onLine ? "I'm not sure about that one. Try asking a staff member nearby, or rephrase the question." : "I can't reach Claude without signal, and I didn't find that in the tour notes. Try again when you have signal.";
+  if(!ans) ans = navigator.onLine ? "That one isn't covered in my tour notes, and I can't reach Claude right now. Try asking museum staff, or rephrase the question." : "I can't reach Claude without signal, and I didn't find that in the tour notes. Try again when you have signal.";
   $('askAns').innerHTML = ans.replace(/</g,'&lt;') + `<div class="status" style="margin-top:8px">${src==='Claude'?'Answered by Claude using your location.':'From the tour notes on this phone (offline answer).'}${src==='notcfg'?' Claude answers need setup: see the owner note.':''}${src==='err'?' (Claude unavailable: '+errMsg.replace(/</g,'&lt;').slice(0,120)+')':''}</div>`;
   $('askSay').style.display=''; $('askSay').onclick=()=>sayAnswer(ans);
   sayAnswer(ans);
