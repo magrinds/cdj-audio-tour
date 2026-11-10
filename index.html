@@ -3,34 +3,37 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="theme-color" content="#1f3b2d">
+<meta name="theme-color" content="#0b2a5b">
 <link rel="manifest" href="manifest.json">
 <title>Campos do Jordão Audio Tour</title>
 <style>
-  :root { --bg:#f6f3ec; --ink:#1d2420; --mute:#6b726d; --accent:#1f3b2d; --accent2:#c7652b; --card:#fff; --line:#e3ddd0; }
+  :root { --bg:#eef4fb; --ink:#0f1f33; --mute:#5b6b80; --accent:#1d4ed8; --accent2:#f59e0b; --card:#fff; --line:#dbe5f2; --deep:#0b2a5b; }
   * { box-sizing:border-box; }
-  body { margin:0; font-family:-apple-system,system-ui,Segoe UI,Roboto,sans-serif; background:var(--bg); color:var(--ink); }
-  header { background:var(--accent); color:#fff; padding:14px 16px; position:sticky; top:0; z-index:5; }
-  header h1 { margin:0; font-size:18px; }
+  body { margin:0; font-family:-apple-system,system-ui,Segoe UI,Roboto,sans-serif; background:linear-gradient(180deg,#dbe8f8 0,#eef4fb 260px); color:var(--ink); }
+  header { background:linear-gradient(135deg,#0b2a5b,#1d4ed8 70%,#3b82f6); color:#fff; padding:16px 18px 14px; position:sticky; top:0; z-index:5; box-shadow:0 4px 18px rgba(11,42,91,.25); }
+  header h1 { margin:0; font-size:20px; letter-spacing:-.01em; }
   header .sub { font-size:12px; opacity:.85; margin-top:2px; }
   main { padding:12px; max-width:640px; margin:0 auto; }
-  .card { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:12px; margin-bottom:12px; }
-  button { font:inherit; border:0; border-radius:10px; padding:10px 14px; background:var(--accent); color:#fff; font-weight:600; }
-  button.secondary { background:#e9e4d8; color:var(--ink); }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:18px; padding:14px; margin-bottom:14px; box-shadow:0 6px 20px rgba(29,78,216,.08); }
+  button { font:inherit; border:0; border-radius:999px; padding:10px 16px; background:var(--accent); color:#fff; font-weight:600; box-shadow:0 2px 8px rgba(29,78,216,.25); }
+  button.secondary { background:#e6eefb; color:var(--deep); box-shadow:none; }
   button.warn { background:var(--accent2); }
   button:disabled { opacity:.45; }
   .row { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
-  #start { width:100%; font-size:18px; padding:16px; }
+  #start { width:100%; font-size:19px; padding:18px; background:linear-gradient(135deg,#1d4ed8,#3b82f6); }
   .status { font-size:13px; color:var(--mute); margin-top:8px; line-height:1.4; }
   .ok { color:#2c7a3f; font-weight:600; } .bad { color:#b3261e; font-weight:600; }
   #now { font-size:15px; }
-  #now .title { font-weight:700; }
-  #now .line { color:var(--mute); font-size:13px; margin-top:4px; min-height:2.6em; }
-  svg { width:100%; height:auto; background:#e8efe6; border-radius:10px; display:block; }
+  #now .title { font-weight:700; color:var(--accent); font-size:14px; text-transform:uppercase; letter-spacing:.04em; }
+  #now .line { color:var(--ink); font-size:24px; font-weight:600; line-height:1.35; margin-top:8px; min-height:3.2em; }
+  body.hoh .quiz .qt, body.hoh .quiz .qa { font-size:24px; }
+  body.hoh #now .line { font-size:32px; line-height:1.3; }
+  body.hoh #now { border:3px solid var(--accent); }
+  svg { width:100%; height:auto; background:#e3eefb; border-radius:14px; display:block; }
   .stop { display:flex; gap:10px; align-items:center; padding:10px 0; border-top:1px solid var(--line); }
   .stop:first-child { border-top:0; }
-  .num { width:28px; height:28px; border-radius:50%; background:var(--accent); color:#fff; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:13px; flex:none; }
-  .num.done { background:#9aa79f; }
+  .num { width:30px; height:30px; border-radius:50%; background:linear-gradient(135deg,#1d4ed8,#3b82f6); color:#fff; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:13px; flex:none; }
+  .num.done { background:#a8b6c9; }
   .stop .info { flex:1; min-width:0; }
   .stop .name { font-weight:600; font-size:15px; }
   .stop .meta { font-size:12px; color:var(--mute); }
@@ -40,15 +43,15 @@
   details summary { cursor:pointer; font-weight:600; }
   .script { font-size:14px; line-height:1.5; white-space:pre-wrap; color:#333; margin-top:8px; }
 
-  .stage { position:relative; overflow:hidden; border-radius:12px; aspect-ratio:16/9; background:#cfe0d4; margin-bottom:12px; border:1px solid var(--line); }
+  .stage { position:relative; overflow:hidden; border-radius:20px; box-shadow:0 10px 28px rgba(11,42,91,.22); aspect-ratio:16/9; background:#cfe0d4; margin-bottom:12px; border:1px solid var(--line); }
   .stage svg.scene { position:absolute; inset:0; width:100%; height:100%; background:none; border-radius:0; animation:kb 22s ease-in-out infinite alternate; transform-origin:var(--ox,50%) var(--oy,50%); }
   @keyframes kb { from { transform:scale(1) translate(0,0); } to { transform:scale(1.22) translate(var(--tx,-3%),var(--ty,-2%)); } }
   .stage .cap { position:absolute; left:0; right:0; bottom:0; padding:22px 12px 10px; background:linear-gradient(transparent,rgba(0,0,0,.65)); color:#fff; font-weight:700; font-size:16px; }
   .stage .cap small { display:block; font-weight:500; font-size:12px; opacity:.9; }
-  .quiz { background:#fff4e6; border:1px solid #f0c89c; border-radius:12px; padding:12px; margin-bottom:12px; display:none; }
+  .quiz { background:linear-gradient(135deg,#fff7e6,#fff1d6); border:1px solid #fcd38a; border-radius:18px; padding:12px; margin-bottom:12px; display:none; }
   .quiz .qh { font-size:12px; font-weight:700; color:var(--accent2); letter-spacing:.05em; }
-  .quiz .qt { font-size:16px; font-weight:600; margin-top:4px; }
-  .quiz .qa { font-size:15px; margin-top:8px; color:#2c7a3f; font-weight:600; display:none; }
+  .quiz .qt { font-size:19px; font-weight:600; margin-top:4px; }
+  .quiz .qa { font-size:18px; margin-top:8px; color:#2c7a3f; font-weight:600; display:none; }
   .quiz .qc { font-size:28px; font-weight:800; color:var(--accent2); margin-top:4px; }
   .fade { animation:fadein .8s ease; } @keyframes fadein { from{opacity:0} to{opacity:1} }
 </style>
@@ -89,6 +92,10 @@
     <div class="row" style="justify-content:space-between">
       <label style="flex:1">Auto-play when you arrive</label>
       <input type="checkbox" id="auto" checked style="width:22px;height:22px">
+    </div>
+    <div class="row" style="justify-content:space-between;margin-bottom:8px">
+      <label style="flex:1"><b style="color:var(--ink)">Hard-of-hearing mode</b><br>Extra-large captions, no sound, vibrates at each new stop</label>
+      <input type="checkbox" id="hoh" style="width:22px;height:22px">
     </div>
     <label for="voice">Voice</label>
     <select id="voice"></select>
@@ -262,11 +269,11 @@ function proj(lat,lng){ return [ox+(lng-minLng)*kx*s, oy+(maxLat-lat)*s]; }
 function drawMap(){
   const svg=$('map'); let h='';
   const route = ['drive1','felicia','palacio','tb','mosteiro','abernessia'].map(id=>STOPS.find(x=>x.id===id));
-  h+=`<polyline points="${route.map(p=>proj(p.lat,p.lng).join(',')).join(' ')}" fill="none" stroke="#7d9a86" stroke-width="3" stroke-dasharray="6 5"/>`;
+  h+=`<polyline points="${route.map(p=>proj(p.lat,p.lng).join(',')).join(' ')}" fill="none" stroke="#7ea6e0" stroke-width="3" stroke-dasharray="6 5"/>`;
   STOPS.forEach((p,i)=>{ const [x,y]=proj(p.lat,p.lng);
-    if(p.radius>0){ const r=Math.max(4,p.radius*s/111320); h+=`<circle cx="${x}" cy="${y}" r="${r}" fill="#1f3b2d" opacity=".08"/>`; }
+    if(p.radius>0){ const r=Math.max(4,p.radius*s/111320); h+=`<circle cx="${x}" cy="${y}" r="${r}" fill="#1d4ed8" opacity=".08"/>`; }
     const done=played.has(p.id);
-    h+=`<circle cx="${x}" cy="${y}" r="9" fill="${done?'#9aa79f':'#1f3b2d'}"/><text x="${x}" y="${y+4}" text-anchor="middle" font-size="10" font-weight="700" fill="#fff">${i+1}</text>`;
+    h+=`<circle cx="${x}" cy="${y}" r="9" fill="${done?'#a8b6c9':'#1d4ed8'}"/><text x="${x}" y="${y+4}" text-anchor="middle" font-size="10" font-weight="700" fill="#fff">${i+1}</text>`;
     if(p.mapLabel){ const below=(p.id==='abernessia'); h+=`<text x="${x}" y="${below?y+23:y-13}" text-anchor="middle" font-size="11" fill="#1d2420">${p.mapLabel}</text>`; }
   });
   if(lastFix){ const [x,y]=proj(lastFix.lat,lastFix.lng);
@@ -301,6 +308,8 @@ function loadVoices(){
   if(!saved){ const pref = list.find(v=>v.localService && /en[-_]US/i.test(v.lang)) || list.find(v=>v.localService) || list[0]; if(pref) $('voice').value=pref.name; }
 }
 if(synth){ loadVoices(); synth.onvoiceschanged = loadVoices; }
+$('hoh').checked = store.get('cdj_hoh',false); document.body.classList.toggle('hoh',$('hoh').checked);
+$('hoh').onchange = ()=>{ document.body.classList.toggle('hoh',$('hoh').checked); store.set('cdj_hoh',$('hoh').checked); if($('hoh').checked && synth) synth.cancel(); if(current){ current.token=Math.random(); speakNext(); } };
 $('voice').onchange = ()=>store.set('cdj_voice',$('voice').value);
 $('rate').oninput = ()=>{ $('rateVal').textContent=(+$('rate').value).toFixed(2); store.set('cdj_rate',$('rate').value); };
 $('rate').value = store.get('cdj_rate','1'); $('rateVal').textContent=(+$('rate').value).toFixed(2);
@@ -324,6 +333,11 @@ function speakNext(){
   u.onend = ()=>{ if(!current||current.token!==myToken||paused) return; current.idx++; speakNext(); };
   u.onerror = (e)=>{ if(!current||current.token!==myToken||paused) return; if(e.error==='interrupted'||e.error==='canceled') return; current.idx++; speakNext(); };
   $('nowLine').textContent = text;
+  if(document.body.classList.contains('hoh')){
+    const ms = Math.max(2200, text.length*70/(+$('rate').value));
+    qTimer = setTimeout(()=>{ if(!current||current.token!==myToken||paused) return; current.idx++; speakNext(); }, ms);
+    return;
+  }
   synth.speak(u);
 }
 function startStop(id){
@@ -338,7 +352,8 @@ function startStop(id){
   $('nowTitle').textContent = '🔊 '+stop.name; $('pauseBtn').textContent='Pause';
   ['pauseBtn','stopBtn','skipBtn'].forEach(b=>$(b).disabled=false);
   renderStops(); drawMap();
-  if(!synth){ $('nowLine').textContent='Speech not supported in this browser.'; return; }
+  if(document.body.classList.contains('hoh') && navigator.vibrate){ try{ navigator.vibrate([200,100,200]); }catch(e){} }
+  if(!synth && !document.body.classList.contains('hoh')){ $('nowLine').textContent='Speech not supported in this browser.'; return; }
   setTimeout(speakNext, 150);
 }
 function finishCurrent(){
@@ -352,7 +367,7 @@ function enqueue(id){
   if(!current) startStop(id); else queue.push(id);
 }
 $('pauseBtn').onclick = ()=>{ if(!current) return;
-  if(!paused){ paused=true; synth.cancel(); $('pauseBtn').textContent='Resume'; }
+  if(!paused){ paused=true; clearTimeout(qTimer); synth && synth.cancel(); $('pauseBtn').textContent='Resume'; }
   else { paused=false; $('pauseBtn').textContent='Pause'; current.token=Math.random(); speakNext(); } };
 $('stopBtn').onclick = ()=>{ queue=[]; synth && synth.cancel(); current=null; paused=false; finishCurrent(); };
 $('skipBtn').onclick = ()=>{ synth && synth.cancel(); current=null; paused=false; finishCurrent(); };
