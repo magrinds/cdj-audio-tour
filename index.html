@@ -546,7 +546,7 @@ function armBtn(btn,key,label,orig){ if(isArmed(key)){ btn.innerHTML=label; btn.
 function renderStops(){
   try{ renderRide(); }catch(e){}
   const btn=(id)=>`<button data-play="${id}" ${isArmed('play:'+id)?'style="background:var(--accent2)"':''}>${isArmed('play:'+id)?armed.label:'▶'}</button>`;
-  const hide = store.get('cdj_hideplayed', false);
+  const hide = store.get('cdj_hideplayed', true);
   const row=(id,badge,name,meta,done)=> (hide && done) ? '' : `<div class="stop" data-id="${id}"><div class="num ${done?'done':''}">${badge}</div><div class="info"><div class="name">${name}</div><div class="meta">${meta}</div></div>${btn(id)}</div>`;
   const nearMuseum = lastFix && dist(lastFix.lat,lastFix.lng,-22.743852,-45.632977)<500;
   const moving = lastFix && lastFix.speed!=null && lastFix.speed>4;
@@ -564,7 +564,7 @@ function renderStops(){
   const next = STOPS.find(p=>!played.has(p.id) && (!p.after || played.has(p.after)) && (!p.before || !played.has(p.before)));
   $('stops').innerHTML =
     (next ? `<div class="upnext"><div class="lbl">Up next</div>${row(next.id,'▸',next.name, (lastFix?fmt(dist(lastFix.lat,lastFix.lng,next.lat,next.lng))+' away · ':'')+(next.radius?(next.walk?'plays on arrival':'plays as you pass'):'tap to play'), false)}</div>` : '') +
-    `<label class="hidep"><input type="checkbox" id="hidePlayed" ${hide?'checked':''}> Hide played</label>` +
+    `<label class="hidep"><input type="checkbox" id="hidePlayed" ${hide?'checked':''}> Hide played (uncheck to replay or reset)</label>` +
     sec('tour','📍 Tour stops',STOPS,tourRows,!nearMuseum) +
     sec('museum','🗿 Museum walk',MUSEUM,musRows,nearMuseum) +
     sec('walk','🚶 Walking stories',WALKSTORIES,walkRows,false) +
