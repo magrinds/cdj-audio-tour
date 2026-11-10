@@ -96,6 +96,7 @@
   .ridebox .ridebody { background:#fff; border:1px solid var(--line); border-radius:18px; padding:14px; margin-top:8px; box-shadow:0 6px 20px rgba(29,78,216,.08); }
   .fabp { position:fixed; left:16px; bottom:26px; z-index:20; padding:12px 18px; font-size:16px; background:var(--deep); color:#fff; box-shadow:0 6px 18px rgba(11,42,91,.35); }
   .fabp.resume { background:var(--accent2); }
+  .fabr { position:fixed; left:16px; bottom:84px; z-index:20; padding:10px 14px; font-size:14px; background:#fff; color:var(--deep); box-shadow:0 6px 18px rgba(11,42,91,.25); }
 </style>
 </head>
 <body>
@@ -124,6 +125,7 @@
     <div class="title" id="nowTitle">Nothing playing</div>
     <div class="line" id="nowLine"></div>
     <div class="row" style="margin-top:8px">
+      <button id="rewBtn" class="secondary" disabled>⏪ 10s</button>
       <button id="pauseBtn" class="secondary" disabled>Pause</button>
       <button id="stopBtn" class="secondary" disabled>Stop</button>
       <button id="skipBtn" class="secondary" disabled>Skip ▸</button>
@@ -176,6 +178,7 @@
 
 <button class="fab" id="fab" aria-label="Add photo">📷<span class="badge" id="badge"></span></button>
 <button class="fabp" id="fabPause" style="display:none">⏸ Pause</button>
+<button class="fabr" id="fabRew" style="display:none">⏪ 10s</button>
 <button class="fab2" id="albumBtn">🖼 Album</button>
 <input type="file" id="camIn" accept="image/*" capture="environment" hidden>
 <input type="file" id="galIn" accept="image/*" multiple hidden>
@@ -523,8 +526,17 @@ function togglePause(){ if(!current) return;
   if(!paused){ paused=true; clearTimeout(qTimer); synth && synth.cancel(); $('pauseBtn').textContent='Resume'; }
   else { paused=false; $('pauseBtn').textContent='Pause'; current.token=Math.random(); speakNext(); }
   syncPause(); }
-function syncPause(){ const f=$('fabPause'); f.style.display=current?'':'none'; f.textContent=paused?'▶ Resume':'⏸ Pause'; f.classList.toggle('resume',paused); }
-$('pauseBtn').onclick=togglePause; $('fabPause').onclick=togglePause;
+function estSec(it){ if(typeof it==='object'){ if(it.pause) return it.pause; it=it.t; } return Math.max(1.5, (it||'').length*0.065/(+$('rate').value||1)); }
+function rewind(){ if(!current) return;
+  clearTimeout(qTimer); synth && synth.cancel();
+  let i=current.idx, acc=0; // restart current sentence, then step back until ~10s covered
+  while(i>0 && acc<10){ i--; acc+=estSec(current.sentences[i]); }
+  current.idx=i; current.token=Math.random();
+  if(!paused) setTimeout(speakNext,120); else { const it=current.sentences[i]; $('nowLine').textContent=typeof it==='object'?(it.t||''):it; }
+}
+$('rewBtn').onclick=rewind;
+function syncPause(){ const f=$('fabPause'); f.style.display=current?'':'none'; $('fabRew').style.display=current?'':'none'; $('rewBtn').disabled=!current; f.textContent=paused?'▶ Resume':'⏸ Pause'; f.classList.toggle('resume',paused); }
+$('pauseBtn').onclick=togglePause; $('fabPause').onclick=togglePause; $('fabRew').onclick=rewind;
 $('stopBtn').onclick = ()=>{ queue=[]; synth && synth.cancel(); current=null; paused=false; finishCurrent(); };
 $('skipBtn').onclick = ()=>{ synth && synth.cancel(); current=null; paused=false; finishCurrent(); };
 $('testVoice').onclick = ()=>{ unlockAudio(); synth.cancel(); const u=new SpeechSynthesisUtterance('Bem-vindo! Welcome to Campos do Jordão.'); const v=voices.find(v=>v.name===$('voice').value); if(v){u.voice=v;u.lang=v.lang;} u.rate=+$('rate').value; synth.speak(u); };
