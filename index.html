@@ -97,8 +97,8 @@
       <label style="flex:1"><b style="color:var(--ink)">Hard-of-hearing mode</b><br>Extra-large captions, no sound, vibrates at each new stop</label>
       <input type="checkbox" id="hoh" style="width:22px;height:22px">
     </div>
-    <label for="voice">Voice</label>
-    <select id="voice"></select>
+    <div id="voiceWrap"><label for="voice">Voice</label>
+    <select id="voice"></select></div>
     <label for="rate" style="display:block;margin-top:8px">Speed: <span id="rateVal">1.0</span>×</label>
     <input type="range" id="rate" min="0.7" max="1.4" step="0.05" value="1">
     <div class="row" style="margin-top:10px">
@@ -125,6 +125,20 @@ The official founding came in 1874, when Mateus da Costa Pinto formed a small se
 Now look up at the trees. Those tall pines shaped like candelabras are Araucarias, the signature tree of the Serra da Mantiqueira mountains. Their seed, called pinhão, is a beloved winter snack here, boiled or roasted. It's out of season in November, but if you see pinhão on a menu, now you know.
 Our first stop is an outdoor sculpture museum set in native forest. Enjoy the ride.` },
 
+ { id:"jaguaribe", name:"Vila Jaguaribe (drive-by)", lat:-22.7287426, lng:-45.583387, radius:350, walk:false, mapLabel:"Jaguaribe", before:"felicia",
+   text:`We're rolling through Vila Jaguaribe, one of the oldest parts of town. Historians say the city started from this little village and spread along the valley of the Capivari stream, which created the neighborhoods you know today.
+And here's a fun one. Capivari comes from the Tupi language and means river of the capybaras, the giant guinea pigs of South America. So the fanciest shopping street in the Brazilian Switzerland is named after a rodent the size of a Labrador.
+In the sanatorium years, Jaguaribe and Abernéssia were packed with boarding houses for patients. Some were run by families who rented every spare room, because the hospitals never had enough beds. Keep an eye out for older wooden houses with deep porches. Porches mattered here: patients were prescribed hours of rest in the open mountain air, wrapped in blankets, every single day.` },
+ { id:"mantiqueira", name:"Climbing the Mantiqueira", lat:-22.7365, lng:-45.6045, radius:400, walk:false, mapLabel:"", before:"felicia",
+   text:`We're climbing now on Avenida Adhemar de Barros, toward the Alto da Boa Vista, the "high good view." Watch your ears pop.
+These mountains are the Serra da Mantiqueira, and the name is pure poetry. It comes from the Tupi language and is usually translated as "the mountain that weeps," or "the mountain that cries." The tears are water. These hills are full of springs and streams that feed rivers for millions of people in São Paulo, Minas Gerais, and Rio de Janeiro.
+The Mantiqueira runs for hundreds of kilometers along the border of three states, and its peaks rise to almost three thousand meters. On a clear day from up here you can look down into the Paraíba Valley, the industrial corridor between São Paulo and Rio.
+Up ahead, our first stop: a museum where the art lives outdoors, in the forest.` },
+ { id:"mercado", name:"Mercado Municipal (drive-by)", lat:-22.7385814, lng:-45.5927793, radius:150, walk:false, mapLabel:"", after:"felicia",
+   text:`On your side, that's the Municipal Market of Campos do Jordão. Let's be honest: it has seen better days, and locals have been asking for a renovation for years. But markets like this are where the real town shops, away from the Capivari price tags. In season you'll find mountain produce, cheeses, cured meats, and pinhão by the sack in winter.` },
+ { id:"teresinha", name:"Igreja Santa Teresinha", lat:-22.7399843, lng:-45.5917832, radius:120, walk:false, mapLabel:"", after:"felicia",
+   text:`Nearby is the parish church of Santa Teresinha, the main church of Abernéssia, dedicated to Saint Thérèse of Lisieux, the French nun known as the Little Flower. Visitors say it looks simple from the outside, but the inside is a surprise, with a beautiful ceiling and colorful stained glass windows. If the door is open and you have five minutes, peek in.` },
+
  { id:"felicia", name:"Museu Felícia Leirner", lat:-22.743852, lng:-45.632977, radius:130, walk:true, mapLabel:"Museum",
    text:`Welcome to the Felícia Leirner Museum. Nearly ninety sculptures, in bronze, white cement, and granite, are set outdoors along these forest paths.
 The artist's story is wonderful. Felícia, Feiga in the original Polish, was born in Warsaw in 1904 to a family of modest means. Her son remembered that she sang in the chorus of the Warsaw Opera, and that's where his father fell in love with her. She arrived in Brazil in 1927.
@@ -147,14 +161,14 @@ Adhemar de Barros is one of the most colorful figures in Brazilian politics. He 
 Inside are about three thousand two hundred square meters, thirty five spaces and one hundred and five rooms, with furniture from the seventeenth to the twentieth centuries, porcelain, silver, heavy velvet curtains, and art including Tarsila do Amaral, Brazil's most famous modernist painter. A funny detail: because the governor still uses it, especially on weekends, phones and cameras are not allowed inside.
 In 1970 it was declared a public monument and opened to visitors, and that same year its grand hall hosted the first winter concerts, which grew into the festival we just learned about. If you're still in town Wednesday through Sunday, the guided tour is free.` },
 
- { id:"tb", name:"The tuberculosis story (drive down)", lat:-22.7365, lng:-45.6045, radius:400, walk:false, mapLabel:"",
+ { id:"tb", after:"felicia", name:"The tuberculosis story (drive down)", lat:-22.7365, lng:-45.6045, radius:400, walk:false, mapLabel:"",
    text:`As we drive downhill, here's the big story nobody tells you in Capivari. This town exists because of tuberculosis.
 In the early twentieth century, the sanitarian doctor Emílio Ribas, who had studied the disease in Europe, decided the cold, dry mountain air of the Mantiqueira was the ideal place for sanatoriums. The fresh air was the treatment.
 The problem was getting sick people up the mountain. Before the railway, the climb was made on foot, on horseback, or in litters carried by enslaved people. So Ribas and his colleague Victor Godinho built a railway. It opened on November fifteenth, 1914, and runs forty seven kilometers, climbing from five hundred and fifty five meters in the Paraíba Valley to nearly one thousand six hundred meters here. A medical footnote: despite Ribas doing much of the pioneering work, history mostly credits Oswaldo Cruz for those public health campaigns. The railway is in the news again, by the way. The state is handing it to a private operator, with plans to bring back the Maria Fumaça steam train.
 The town filled with patients. By the mid 1940s there were fourteen sanatoriums, plus dozens of boarding houses that were never enough. The town was even run as a special "sanitary prefecture" starting in 1926. There's a famous Brazilian novel, Floradas na Serra, about the lives of patients recovering in these boarding houses.
 Then, from the 1950s on, antibiotics defeated tuberculosis, and the town lost its reason to exist. So it reinvented itself as a mountain resort, and leaned into Swiss and German architecture to attract tourists. The Brazilian Switzerland is the rebrand of a former hospital town.` },
 
- { id:"abernessia", name:"Vila Abernéssia", lat:-22.7382467, lng:-45.5919284, radius:300, walk:false, mapLabel:"Abernéssia",
+ { id:"abernessia", after:"felicia", name:"Vila Abernéssia", lat:-22.7382467, lng:-45.5919284, radius:300, walk:false, mapLabel:"Abernéssia",
    text:`Welcome to Abernéssia, the Scottish neighborhood. This district was built by a Scottish engineer named Robert John Reid, born in Aberdeen and educated at Oxford. He was a very tall man, and he used to walk around town wearing a traditional kilt. Picture that in rural Brazil a hundred years ago.
 The name Abernéssia doesn't exist in Scotland. Reid invented it. A local historian says it blends Aberdeen, where Reid was born, Inverness, and Escócia, the Portuguese word for Scotland. The area used to be called simply Vila Nova, the New Village. Then Reid donated land for the train station and insisted it carry the same name as his own property. Classic move: donate the land, name the station.
 He was paid for his surveying work in land, and as that historian put it, he became very rich in land, but at the time land up here was worth almost nothing. His heirs probably feel differently today.
@@ -173,6 +187,17 @@ Thank you for joining the tour. I hope Campos do Jordão now feels like more tha
 ];
 
 
+
+const ORDER=['drive1','jaguaribe','mantiqueira','felicia','auditorio','palacio','tb','abernessia','mercado','teresinha','mosteiro'];
+STOPS.sort((a,b)=>ORDER.indexOf(a.id)-ORDER.indexOf(b.id));
+const FILLERS = [
+ {id:"f_ribas", name:"Story: the doctor who let mosquitoes bite him", text:`While we drive, a story about Emílio Ribas, the doctor behind this town's railway. In the early 1900s, many doctors still believed yellow fever spread through dirty clothes and bedding. Ribas believed the real culprit was a mosquito. To prove it, he and fellow volunteers let themselves be bitten by mosquitoes that had fed on yellow fever patients. They got sick, they survived, and the experiment helped convince Brazil to fight the mosquito instead of burning patients' sheets. Today São Paulo's main infectious disease hospital is named after him: the Instituto Emílio Ribas.`},
+ {id:"f_araucaria", name:"Story: the tree and the forgetful bird", text:`Look out the window for the Araucaria pines, the ones shaped like candelabras. Their family is ancient. Their ancestors were around in the age of the dinosaurs. Today the Paraná pine is critically endangered, after a century of logging. There's a lovely legend about how these forests spread. A bird called the gralha azul, the azure jay, buries pinhão seeds to eat later, then forgets where it hid many of them. The forgotten seeds sprout. So, the story goes, a forgetful blue bird has been planting these forests for thousands of years.`},
+ {id:"f_food", name:"Story: what to eat in the mountains", text:`Let's talk food. Mountain food here is cold weather food, and Brazilians drive hours for it. Fondue, of cheese and of chocolate, is practically a religion in July. Trout is raised in the cold mountain streams and shows up grilled, smoked, or in pâté. Chocolate shops line Capivari, and craft beer is big too. And in winter, the star is pinhão, the Araucaria seed: boiled, roasted on a wood stove, or ground into a sweet paçoca. For anyone watching saturated fat, grilled trout is your best friend on these menus.`},
+ {id:"f_winter", name:"Story: Brazil's winter capital", text:`Here's the strange thing about Campos do Jordão: most of Brazil is warm all year, so cold is the attraction. In July, during school holidays and the Winter Festival, the town's population can multiply, roads jam, and hotel prices soar. Paulistanos come up to wear the wool coats they never get to use at home, sit by fireplaces, and eat fondue. Some winter nights the temperature drops below freezing and the fields turn white with frost. You're here in spring, which means fewer crowds, lower prices, and the hydrangeas starting to bloom.`},
+ {id:"f_swiss", name:"Story: how a hospital town became Switzerland", text:`Think about the timeline. In the 1940s, this was a town of sanatoriums, coughing patients, and boarding houses. Healthy visitors were nervous to come. When antibiotics arrived and tuberculosis retreated, the town needed a new identity, fast. Developers and city leaders leaned into a European fantasy: chalets, half timbering, Swiss and German names, fondue. It worked brilliantly. The nickname "the Brazilian Switzerland" stuck. But every time you see a postcard chalet, remember it's a costume, worn by a town that was built to heal.`}
+];
+
 const QUIZ = {
  drive1:{ask:"Who was listening? Who is the town named after?", ans:"Brigadier Jordão, who owned the land. You're staying in Jordan's Pasture!"},
  felicia:{ask:"How old was Felícia when she started sculpting? Twenty four, forty four, or sixty four?", ans:"Forty four. Never too late!"},
@@ -180,9 +205,11 @@ const QUIZ = {
  palacio:{ask:"How long did it take to build the palace? Six, sixteen, or twenty six years?", ans:"Twenty six years, from 1938 to 1964."},
  tb:{ask:"What was the mountain railway originally built to carry?", ans:"Tuberculosis patients, up to the sanatoriums."},
  abernessia:{ask:"The made up name Abernéssia blends which two Scottish places?", ans:"Aberdeen and Inverness, plus Escócia, Portuguese for Scotland."},
+ jaguaribe:{ask:"What animal is the Capivari stream named after?", ans:"The capybara, the world's largest rodent!"},
+ mantiqueira:{ask:"The Tupi name Mantiqueira is often translated as what?", ans:"The mountain that weeps, for all its springs and streams."},
  mosteiro:{ask:"What does the Benedictine motto, ora et labora, mean?", ans:"Pray and work. The shop is the work part!"}
 };
-const LOOK = { drive1:"Look for: tall candelabra-shaped Araucaria pines", felicia:"Look for: bronze and cement shapes among the trees", auditorio:"Look for: the glass and stone concert hall",
+const LOOK = { jaguaribe:"Look for: old wooden houses with deep porches", mantiqueira:"Look for: views down into the Paraíba Valley", mercado:"Look for: the Municipal Market on Av. Adhemar de Barros", teresinha:"Look for: the parish church of Santa Teresinha", drive1:"Look for: tall candelabra-shaped Araucaria pines", felicia:"Look for: bronze and cement shapes among the trees", auditorio:"Look for: the glass and stone concert hall",
   palacio:"Look for: the Tudor-style palace with its tower", tb:"Look for: old sanatorium buildings and the rail line", abernessia:"Look for: the Abernéssia train station", mosteiro:"Look for: the cypress grove, lake and grotto" };
 const AR = (x,y,s)=>`<g transform="translate(${x},${y}) scale(${s})"><rect x="-2" y="-60" width="4" height="60" fill="#5a4030"/><path d="M0,-62 q-30,-4 -40,4 M0,-62 q30,-4 40,4 M0,-50 q-26,-2 -34,6 M0,-50 q26,-2 34,6" stroke="#2f5a3a" stroke-width="7" fill="none" stroke-linecap="round"/><ellipse cx="0" cy="-66" rx="26" ry="6" fill="#2f5a3a"/></g>`;
 const SKY = (a,b)=>`<defs><linearGradient id="sk" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${a}"/><stop offset="1" stop-color="${b}"/></linearGradient></defs><rect width="400" height="225" fill="url(#sk)"/>`;
@@ -223,9 +250,10 @@ const SCENES = {
    <rect x="150" y="115" width="100" height="60" fill="#f1ebdf"/><path d="M142,118 L200,85 L258,118Z" fill="#8a3b2b"/><rect x="192" y="60" width="16" height="28" fill="#f1ebdf"/><path d="M200,45v15M193,52h14" stroke="#5a3a2a" stroke-width="3"/>
    <path d="M190,175v-25a10,10 0 0 1 20,0v25z" fill="#5a3a2a"/><ellipse cx="290" cy="200" rx="50" ry="10" fill="#7fb0c9"/><ellipse cx="290" cy="198" rx="30" ry="4" fill="#cfe6f0" opacity=".7"/>`}
 };
+const SCENE_ALIAS={jaguaribe:'drive1',mantiqueira:'tb',mercado:'abernessia',teresinha:'mosteiro'};
 function showScene(id){
-  const s=SCENES[id]; const p=STOPS.find(x=>x.id===id); if(!s) return;
-  $('stage').innerHTML = `<svg class="scene fade" viewBox="0 0 400 225" preserveAspectRatio="xMidYMid slice" style="--ox:${s.ox};--oy:${s.oy};--tx:${s.tx};--ty:${s.ty}">${s.svg}</svg><div class="cap fade">${s.c}<small>${LOOK[id]||''}</small></div>`;
+  const s=SCENES[id]||SCENES[SCENE_ALIAS[id]]||(String(id).startsWith('f_')?SCENES.drive1:null); const p=STOPS.find(x=>x.id===id); if(!s) return;
+  $('stage').innerHTML = `<svg class="scene fade" viewBox="0 0 400 225" preserveAspectRatio="xMidYMid slice" style="--ox:${s.ox};--oy:${s.oy};--tx:${s.tx};--ty:${s.ty}">${s.svg}</svg><div class="cap fade">${(STOPS.find(x=>x.id===id)||FILLERS.find(x=>x.id===id)||{}).name||s.c}<small>${LOOK[id]||(String(id).startsWith('f_')?'Story time while we drive':'')}</small></div>`;
 }
 let qTimer=null;
 function quizUI(mode, id, n){
@@ -248,6 +276,7 @@ let paused = false;
 let voices = [];
 let lastFix = null, prevFix = null;
 let started = false;
+let lastActivity = Date.now();
 let wakeLock = null;
 const synth = window.speechSynthesis;
 
@@ -268,7 +297,7 @@ const ox = (W-(maxLng-minLng)*kx*s)/2, oy=(H-(maxLat-minLat)*s)/2;
 function proj(lat,lng){ return [ox+(lng-minLng)*kx*s, oy+(maxLat-lat)*s]; }
 function drawMap(){
   const svg=$('map'); let h='';
-  const route = ['drive1','felicia','palacio','tb','mosteiro','abernessia'].map(id=>STOPS.find(x=>x.id===id));
+  const route = ['drive1','jaguaribe','abernessia','mantiqueira','palacio','felicia','palacio','tb','mosteiro','abernessia'].map(id=>STOPS.find(x=>x.id===id));
   h+=`<polyline points="${route.map(p=>proj(p.lat,p.lng).join(',')).join(' ')}" fill="none" stroke="#7ea6e0" stroke-width="3" stroke-dasharray="6 5"/>`;
   STOPS.forEach((p,i)=>{ const [x,y]=proj(p.lat,p.lng);
     if(p.radius>0){ const r=Math.max(4,p.radius*s/111320); h+=`<circle cx="${x}" cy="${y}" r="${r}" fill="#1d4ed8" opacity=".08"/>`; }
@@ -292,10 +321,11 @@ function renderStops(){
     return `<div class="stop"><div class="num ${done?'done':''}">${i+1}</div>
       <div class="info"><div class="name">${p.name}</div><div class="meta">${d?d+' away · ':''}${done?'played · ':''}${trig}</div></div>
       <button data-play="${p.id}">▶</button></div>`;
-  }).join('');
+  }).join('') + `<div style="margin-top:12px;font-weight:700;font-size:14px;color:var(--accent)">🚗 Stories for the road (auto-play while moving)</div>` +
+  FILLERS.map(f=>`<div class="stop"><div class="num ${played.has(f.id)?'done':''}">★</div><div class="info"><div class="name">${f.name.replace('Story: ','').replace(/^./,c=>c.toUpperCase())}</div><div class="meta">${played.has(f.id)?'played':'plays when nothing else is'}</div></div><button data-play="${f.id}">▶</button></div>`).join('');
   document.querySelectorAll('[data-play]').forEach(b=>b.onclick=()=>{ unlockAudio(); playNow(b.dataset.play); });
 }
-$('scripts').innerHTML = STOPS.map((p,i)=>`<h3 style="margin:14px 0 0;font-size:15px">${i+1}. ${p.name}</h3><div class="script">${p.text}</div>`).join('');
+$('scripts').innerHTML = STOPS.concat(FILLERS).map((p,i)=>`<h3 style="margin:14px 0 0;font-size:15px">${i+1}. ${p.name}</h3><div class="script">${p.text}</div>`).join('');
 
 // ---------- speech ----------
 function splitSentences(t){ return t.replace(/\n+/g,' ').match(/[^.!?]+[.!?]+["”]?|[^.!?]+$/g).map(s=>s.trim()).filter(Boolean); }
@@ -304,6 +334,7 @@ function loadVoices(){
   const en = voices.filter(v=>/^en/i.test(v.lang));
   const list = en.length?en:voices;
   const saved = store.get('cdj_voice', null);
+  $('voiceWrap').style.display = list.length>1 ? '' : 'none';
   $('voice').innerHTML = list.map(v=>`<option value="${v.name}" ${v.name===saved?'selected':''}>${v.name} (${v.lang})${v.localService?' · offline':''}</option>`).join('');
   if(!saved){ const pref = list.find(v=>v.localService && /en[-_]US/i.test(v.lang)) || list.find(v=>v.localService) || list[0]; if(pref) $('voice').value=pref.name; }
 }
@@ -341,7 +372,8 @@ function speakNext(){
   synth.speak(u);
 }
 function startStop(id){
-  const stop = STOPS.find(s=>s.id===id); if(!stop) return;
+  const stop = STOPS.find(s=>s.id===id) || FILLERS.find(s=>s.id===id); if(!stop) return;
+  lastActivity=Date.now();
   synth && synth.cancel();
   paused=false;
   const seq = splitSentences(stop.text);
@@ -357,7 +389,7 @@ function startStop(id){
   setTimeout(speakNext, 150);
 }
 function finishCurrent(){
-  current=null; clearTimeout(qTimer); $('nowTitle').textContent='Nothing playing'; $('nowLine').textContent='';
+  lastActivity=Date.now(); current=null; clearTimeout(qTimer); $('nowTitle').textContent='Nothing playing'; $('nowLine').textContent='';
   ['pauseBtn','stopBtn','skipBtn'].forEach(b=>$(b).disabled=true);
   if(queue.length){ const n=queue.shift(); setTimeout(()=>startStop(n),800); }
 }
@@ -387,12 +419,17 @@ function onFix(pos){
   if($('auto').checked && c.accuracy<120){
     for(const p of STOPS){
       if(!p.radius || played.has(p.id)) continue;
+      if(p.after && !played.has(p.after)) continue;
+      if(p.before && played.has(p.before)) continue;
       const d=dist(c.latitude,c.longitude,p.lat,p.lng);
       if(d<=p.radius){
         if(p.walk && spd!=null && spd>3.5) continue; // still in a car, wait until walking
         enqueue(p.id);
       }
     }
+  }
+  if($('auto').checked && !current && !queue.length && spd!=null && spd>4 && Date.now()-lastActivity>25000){
+    const f = FILLERS.find(f=>!played.has(f.id)); if(f) startStop(f.id);
   }
   renderStops(); drawMap();
 }
@@ -411,8 +448,8 @@ $('start').onclick = async ()=>{
     else onGeoErr({message:'not supported'});
     const sw = navigator.serviceWorker && navigator.serviceWorker.controller;
     $('status').innerHTML = `${sw?'<span class="ok">Saved for offline use.</span>':'Offline copy is being saved; reload once while online to be sure.'} Screen will stay on while this page is open.`;
-    if(!played.has('drive1')) startStop('drive1');
   }
+  playNow('drive1');
 };
 
 // ---------- offline ----------
