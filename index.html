@@ -97,6 +97,8 @@
   .fabp { position:fixed; left:16px; bottom:26px; z-index:20; padding:12px 18px; font-size:16px; background:var(--deep); color:#fff; box-shadow:0 6px 18px rgba(11,42,91,.35); }
   .fabp.resume { background:var(--accent2); }
   .fabr { position:fixed; left:16px; bottom:84px; z-index:20; padding:10px 14px; font-size:14px; background:#fff; color:var(--deep); box-shadow:0 6px 18px rgba(11,42,91,.25); }
+  .maptabs { margin-bottom:10px; } .maptabs button { flex:1; padding:8px 10px; font-size:13px; } .maptabs button.on { background:var(--accent); color:#fff; }
+  #gmap { width:100%; height:320px; border:0; border-radius:14px; display:block; background:#e3eefb; }
 </style>
 </head>
 <body>
@@ -133,7 +135,10 @@
   </div>
 
   <div class="card">
-    <svg id="map" viewBox="0 0 400 260"></svg>
+    <div class="row maptabs"><button id="tabG" class="secondary on">Google map</button><button id="tabL" class="secondary">Live position (offline)</button></div>
+    <div id="gwrap"><iframe id="gmap" title="Tour route on Google Maps" loading="lazy" referrerpolicy="no-referrer-when-downgrade" allowfullscreen></iframe>
+      <div class="status" id="gNote">Route: hotel, museum, monastery, back to hotel. <a id="gOpen" target="_blank" rel="noopener">Open in Google Maps ↗</a></div></div>
+    <svg id="map" viewBox="0 0 400 260" style="display:none"></svg>
     <div class="status" id="gpsInfo">GPS: off</div>
   </div>
 
@@ -633,6 +638,20 @@ function renderRide(){
   const w=rideWarning(k); $('rideWarn').style.display=w?'block':'none'; $('rideWarn').innerHTML=w; $('rideFlag').textContent=w?' ⚠️':'';
   $('rideList').innerHTML = Object.entries(DEST).filter(([kk])=>kk!==k).map(([kk,v])=>`<div class="dest"><div class="n">${v.name}<div class="m">${v.note}</div></div>${v.remote?'<span title="Return rides may be hard" style="margin-right:4px">⚠️</span>':''}<a class="mini" href="${uberUrl(v)}">Uber</a><a class="mini sec" href="${mapsUrl(v)}">Maps</a></div>`).join('');
 }
+
+
+// ---------- google map ----------
+(function(){
+  const H='-22.7194257,-45.5611975', M='-22.743852,-45.632977', MO='-22.7362131,-45.5958014';
+  $('gmap').src = `https://maps.google.com/maps?saddr=${H}&daddr=${M}+to:${MO}+to:${H}&output=embed`;
+  $('gOpen').href = `https://www.google.com/maps/dir/?api=1&origin=${H}&destination=${H}&waypoints=${encodeURIComponent(M+'|'+MO)}&travelmode=driving`;
+  function show(g){ $('gwrap').style.display=g?'':'none'; $('map').style.display=g?'none':''; $('tabG').classList.toggle('on',g); $('tabL').classList.toggle('on',!g); store.set('cdj_maptab',g?'g':'l'); }
+  $('tabG').onclick=()=>show(true); $('tabL').onclick=()=>show(false);
+  const pref=store.get('cdj_maptab', navigator.onLine?'g':'l');
+  show(navigator.onLine && pref==='g');
+  window.addEventListener('offline',()=>show(false));
+  if(!navigator.onLine) $('gNote').textContent='Google map needs signal. Showing the offline map.';
+})();
 
 // ---------- photo album ----------
 const SB='https://otlbfbqdwygrkxtvgfyp.supabase.co', SBK='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im90bGJmYnFkd3lncmt4dHZnZnlwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE3MDI0MTksImV4cCI6MjA5NzI3ODQxOX0.9D-bMdK6At0CQijs27z0IT8-lpUEu6I4bZrdPko6PQU';
