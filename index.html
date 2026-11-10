@@ -132,6 +132,7 @@
       <div class="status" id="rideNote" style="margin-top:0"></div>
       <div id="rideWarn" class="warnbox" style="display:none"></div>
       <div class="row" style="margin-top:10px"><a id="rideUber" class="btnlink">Open in Uber</a><a id="rideMaps" class="btnlink sec">Google Maps</a></div>
+      <label style="display:block;margin-top:12px">Where are you going?</label><select id="rideSel"></select>
       <details style="margin-top:12px"><summary style="font-size:14px">Other destinations</summary><div id="rideList"></div></details>
     </div>
   </details>
@@ -825,11 +826,13 @@ function rideWarning(k){
 }
 
 function nextRide(){
+  const o=store.get('cdj_ride','auto'); if(o!=='auto' && DEST[o]) return o;
   if(!played.has('felicia')) return 'museum';
   if(!played.has('mosteiro')) return 'mosteiro';
   return 'hotel';
 }
 function renderRide(){
+  if(!$('rideSel').options.length){ $('rideSel').innerHTML='<option value="auto">Automatic (follow the tour)</option>'+Object.entries(DEST).map(([k,v])=>`<option value="${k}">${v.name}</option>`).join(''); $('rideSel').value=store.get('cdj_ride','auto'); $('rideSel').onchange=()=>{ store.set('cdj_ride',$('rideSel').value); renderRide(); }; }
   const k=nextRide(), d=DEST[k];
   $('rideTo').textContent = d.name;
   const away = lastFix ? ' · '+fmt(dist(lastFix.lat,lastFix.lng,d.lat,d.lng))+' away' : '';
