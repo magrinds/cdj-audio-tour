@@ -39,6 +39,18 @@
   select, input[type=range] { width:100%; }
   details summary { cursor:pointer; font-weight:600; }
   .script { font-size:14px; line-height:1.5; white-space:pre-wrap; color:#333; margin-top:8px; }
+
+  .stage { position:relative; overflow:hidden; border-radius:12px; aspect-ratio:16/9; background:#cfe0d4; margin-bottom:12px; border:1px solid var(--line); }
+  .stage svg.scene { position:absolute; inset:0; width:100%; height:100%; background:none; border-radius:0; animation:kb 22s ease-in-out infinite alternate; transform-origin:var(--ox,50%) var(--oy,50%); }
+  @keyframes kb { from { transform:scale(1) translate(0,0); } to { transform:scale(1.22) translate(var(--tx,-3%),var(--ty,-2%)); } }
+  .stage .cap { position:absolute; left:0; right:0; bottom:0; padding:22px 12px 10px; background:linear-gradient(transparent,rgba(0,0,0,.65)); color:#fff; font-weight:700; font-size:16px; }
+  .stage .cap small { display:block; font-weight:500; font-size:12px; opacity:.9; }
+  .quiz { background:#fff4e6; border:1px solid #f0c89c; border-radius:12px; padding:12px; margin-bottom:12px; display:none; }
+  .quiz .qh { font-size:12px; font-weight:700; color:var(--accent2); letter-spacing:.05em; }
+  .quiz .qt { font-size:16px; font-weight:600; margin-top:4px; }
+  .quiz .qa { font-size:15px; margin-top:8px; color:#2c7a3f; font-weight:600; display:none; }
+  .quiz .qc { font-size:28px; font-weight:800; color:var(--accent2); margin-top:4px; }
+  .fade { animation:fadein .8s ease; } @keyframes fadein { from{opacity:0} to{opacity:1} }
 </style>
 </head>
 <body>
@@ -52,6 +64,8 @@
     <div class="status" id="status">Tap Start to enable GPS, audio, and keep-screen-on. Then you can switch on airplane mode to test offline.</div>
   </div>
 
+  <div class="stage" id="stage"></div>
+  <div class="quiz" id="quiz"><div class="qh">🎯 QUIZ TIME</div><div class="qt" id="qt"></div><div class="qc" id="qc"></div><div class="qa" id="qa"></div></div>
   <div class="card" id="now">
     <div class="title" id="nowTitle">Nothing playing</div>
     <div class="line" id="nowLine"></div>
@@ -151,6 +165,71 @@ And if you're still in town at a quarter to six this evening, the nuns sing Vesp
 Thank you for joining the tour. I hope Campos do Jordão now feels like more than chocolate and chalets.` }
 ];
 
+
+const QUIZ = {
+ drive1:{ask:"Who was listening? Who is the town named after?", ans:"Brigadier Jordão, who owned the land. You're staying in Jordan's Pasture!"},
+ felicia:{ask:"How old was Felícia when she started sculpting? Twenty four, forty four, or sixty four?", ans:"Forty four. Never too late!"},
+ auditorio:{ask:"Which famous bossa nova lyricist wrote songs with Claudio Santoro?", ans:"Vinícius de Moraes, who wrote The Girl from Ipanema."},
+ palacio:{ask:"How long did it take to build the palace? Six, sixteen, or twenty six years?", ans:"Twenty six years, from 1938 to 1964."},
+ tb:{ask:"What was the mountain railway originally built to carry?", ans:"Tuberculosis patients, up to the sanatoriums."},
+ abernessia:{ask:"The made up name Abernéssia blends which two Scottish places?", ans:"Aberdeen and Inverness, plus Escócia, Portuguese for Scotland."},
+ mosteiro:{ask:"What does the Benedictine motto, ora et labora, mean?", ans:"Pray and work. The shop is the work part!"}
+};
+const LOOK = { drive1:"Look for: tall candelabra-shaped Araucaria pines", felicia:"Look for: bronze and cement shapes among the trees", auditorio:"Look for: the glass and stone concert hall",
+  palacio:"Look for: the Tudor-style palace with its tower", tb:"Look for: old sanatorium buildings and the rail line", abernessia:"Look for: the Abernéssia train station", mosteiro:"Look for: the cypress grove, lake and grotto" };
+const AR = (x,y,s)=>`<g transform="translate(${x},${y}) scale(${s})"><rect x="-2" y="-60" width="4" height="60" fill="#5a4030"/><path d="M0,-62 q-30,-4 -40,4 M0,-62 q30,-4 40,4 M0,-50 q-26,-2 -34,6 M0,-50 q26,-2 34,6" stroke="#2f5a3a" stroke-width="7" fill="none" stroke-linecap="round"/><ellipse cx="0" cy="-66" rx="26" ry="6" fill="#2f5a3a"/></g>`;
+const SKY = (a,b)=>`<defs><linearGradient id="sk" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${a}"/><stop offset="1" stop-color="${b}"/></linearGradient></defs><rect width="400" height="225" fill="url(#sk)"/>`;
+const HILLS = `<path d="M0,150 L60,95 L110,130 L170,80 L240,135 L300,90 L360,125 L400,100 L400,225 L0,225Z" fill="#7a9c86"/><path d="M0,175 Q100,140 200,170 T400,160 L400,225 L0,225Z" fill="#5c8569"/>`;
+const SCENES = {
+ drive1:{c:"Climbing out of Capivari", ox:"30%", oy:"60%", tx:"3%", ty:"-2%", svg:`${SKY('#9cc6e8','#e9f2f6')}<circle cx="330" cy="45" r="18" fill="#ffd77a"/>${HILLS}
+   <g><path d="M70,190 l30,-25 l30,25z" fill="#8a3b2b"/><rect x="76" y="190" width="48" height="26" fill="#f2e6d0"/><path d="M76,195h48M100,190v26M76,205h48" stroke="#5a3a2a" stroke-width="2"/></g>
+   <g><path d="M250,195 l26,-22 l26,22z" fill="#8a3b2b"/><rect x="255" y="195" width="42" height="22" fill="#f6efe2"/><path d="M255,200h42M276,195v22" stroke="#5a3a2a" stroke-width="2"/></g>
+   ${AR(170,200,1.1)}${AR(350,205,0.9)}${AR(30,210,0.8)}`},
+ felicia:{c:"Sculptures in the Atlantic Forest", ox:"60%", oy:"55%", tx:"-4%", ty:"-1%", svg:`${SKY('#bcd9c4','#e8f1ea')}<rect y="150" width="400" height="75" fill="#6f9a72"/>${AR(40,170,1.2)}${AR(360,165,1.3)}${AR(300,150,0.8)}
+   <path d="M150,200 q-10,-60 20,-80 q30,20 15,80z" fill="#8b6b4a"/><circle cx="168" cy="130" r="10" fill="#8b6b4a"/>
+   <path d="M215,205 c0,-40 50,-40 50,-80 c10,30 -10,60 10,80z" fill="#d9d4c7" stroke="#b8b2a3"/>
+   <ellipse cx="200" cy="208" rx="120" ry="6" fill="#557a58" opacity=".6"/>`},
+ auditorio:{c:"Auditório Claudio Santoro", ox:"50%", oy:"45%", tx:"-2%", ty:"2%", svg:`${SKY('#a9cbe3','#eef4f7')}${HILLS}
+   <path d="M90,170 L200,95 L310,170Z" fill="#7d6a58"/><path d="M110,170 L200,110 L290,170Z" fill="#9ec4d8" opacity=".9"/>
+   <path d="M140,170V145M170,170V125M200,170V110M230,170V125M260,170V145" stroke="#5c4d40" stroke-width="2"/>
+   <rect x="80" y="170" width="240" height="20" fill="#6b5a4a"/>${AR(50,200,1)}${AR(355,200,1.1)}
+   <g fill="#1d2420"><text x="150" y="88" font-size="14">♪</text><text x="245" y="80" font-size="18">♫</text></g>`},
+ palacio:{c:"Palácio Boa Vista", ox:"45%", oy:"50%", tx:"2%", ty:"-2%", svg:`${SKY('#8fb9de','#eaf1f6')}<rect y="175" width="400" height="50" fill="#6e9670"/>
+   <rect x="100" y="110" width="200" height="70" fill="#efe6d6"/><path d="M95,112 L200,80 L305,112Z" fill="#8a3b2b"/>
+   <rect x="185" y="55" width="30" height="125" fill="#e6dcc9"/><path d="M180,58 L200,35 L220,58Z" fill="#8a3b2b"/>
+   <g stroke="#5a3a2a" stroke-width="3"><path d="M100,130h200M100,155h200M130,110v70M160,110v70M240,110v70M270,110v70"/></g>
+   <rect x="192" y="150" width="16" height="30" fill="#5a3a2a"/>${AR(40,190,1.1)}${AR(360,192,1.2)}`},
+ tb:{c:"The sanatorium railway, 1914", ox:"40%", oy:"60%", tx:"-4%", ty:"-1%", svg:`${SKY('#d8cdb8','#f3eee4')}${HILLS}
+   <path d="M0,195 L400,175" stroke="#4a3a2e" stroke-width="4"/><path d="M0,201 L400,181" stroke="#4a3a2e" stroke-width="2"/>
+   <g transform="translate(120,150) rotate(-3)"><rect x="0" y="10" width="80" height="30" rx="4" fill="#2f2f2f"/><rect x="55" y="-8" width="25" height="24" fill="#3a3a3a"/><rect x="12" y="-6" width="10" height="18" fill="#2f2f2f"/>
+   <circle cx="18" cy="44" r="8" fill="#555"/><circle cx="62" cy="44" r="8" fill="#555"/><rect x="85" y="12" width="70" height="26" rx="3" fill="#8a3b2b"/><path d="M92,18h12M112,18h12M132,18h12" stroke="#f3e2b0" stroke-width="6"/></g>
+   <g fill="#fff" opacity=".85"><circle cx="138" cy="130" r="9"/><circle cx="152" cy="116" r="12"/><circle cx="172" cy="100" r="15"/></g>
+   <rect x="300" y="120" width="70" height="45" fill="#f4efe4"/><path d="M295,122 L335,100 L375,122Z" fill="#7a6a5a"/><path d="M308,132h12M330,132h12M352,132h12M308,148h12M330,148h12M352,148h12" stroke="#7aa3c2" stroke-width="7"/>`},
+ abernessia:{c:"Vila Abernéssia, a Scottish legacy", ox:"55%", oy:"55%", tx:"3%", ty:"-2%", svg:`${SKY('#a3c3d9','#edf2f5')}<rect y="185" width="400" height="40" fill="#9a9a90"/>
+   <rect x="120" y="120" width="160" height="65" fill="#e8dcc8"/><path d="M112,122 L200,88 L288,122Z" fill="#5d4a3c"/><path d="M120,140h160" stroke="#5d4a3c" stroke-width="3"/>
+   <rect x="150" y="150" width="20" height="35" fill="#5d4a3c"/><rect x="230" y="150" width="20" height="35" fill="#5d4a3c"/><rect x="185" y="145" width="30" height="16" fill="#7aa3c2"/>
+   <text x="200" y="135" text-anchor="middle" font-size="10" font-weight="700" fill="#3a2a20">ABERNÉSSIA</text>
+   <g transform="translate(330,150)"><circle cx="0" cy="0" r="7" fill="#e7c09a"/><rect x="-6" y="7" width="12" height="16" fill="#2d4a7a"/><path d="M-8,23 h16 l2,12 h-20z" fill="#b22222"/><path d="M-8,27h20M-4,23v12M3,23v12" stroke="#1d3a6a" stroke-width="2"/><rect x="-5" y="35" width="3" height="12" fill="#e7c09a"/><rect x="2" y="35" width="3" height="12" fill="#e7c09a"/></g>
+   ${AR(50,200,1)}`},
+ mosteiro:{c:"Mosteiro de São João", ox:"50%", oy:"55%", tx:"-3%", ty:"-2%", svg:`${SKY('#c9dcea','#f3f6f2')}<rect y="170" width="400" height="55" fill="#6f9a72"/>
+   <g fill="#2f4a36"><path d="M40,175 q12,-90 24,0z"/><path d="M75,175 q12,-100 24,0z"/><path d="M320,175 q12,-95 24,0z"/><path d="M355,175 q12,-85 24,0z"/></g>
+   <rect x="150" y="115" width="100" height="60" fill="#f1ebdf"/><path d="M142,118 L200,85 L258,118Z" fill="#8a3b2b"/><rect x="192" y="60" width="16" height="28" fill="#f1ebdf"/><path d="M200,45v15M193,52h14" stroke="#5a3a2a" stroke-width="3"/>
+   <path d="M190,175v-25a10,10 0 0 1 20,0v25z" fill="#5a3a2a"/><ellipse cx="290" cy="200" rx="50" ry="10" fill="#7fb0c9"/><ellipse cx="290" cy="198" rx="30" ry="4" fill="#cfe6f0" opacity=".7"/>`}
+};
+function showScene(id){
+  const s=SCENES[id]; const p=STOPS.find(x=>x.id===id); if(!s) return;
+  $('stage').innerHTML = `<svg class="scene fade" viewBox="0 0 400 225" preserveAspectRatio="xMidYMid slice" style="--ox:${s.ox};--oy:${s.oy};--tx:${s.tx};--ty:${s.ty}">${s.svg}</svg><div class="cap fade">${s.c}<small>${LOOK[id]||''}</small></div>`;
+}
+let qTimer=null;
+function quizUI(mode, id, n){
+  const q=QUIZ[id]; const box=$('quiz');
+  if(mode==='hide'){ box.style.display='none'; return; }
+  box.style.display='block'; $('qt').textContent=q.ask;
+  if(mode==='ask'){ $('qa').style.display='none'; $('qc').textContent=''; }
+  if(mode==='count'){ $('qc').textContent=n; }
+  if(mode==='answer'){ $('qc').textContent=''; $('qa').style.display='block'; $('qa').textContent='✅ '+q.ans; }
+}
+
 // ---------- state ----------
 const $ = id => document.getElementById(id);
 const store = { get(k,d){ try{ const v=localStorage.getItem(k); return v===null?d:JSON.parse(v);}catch(e){return d;} },
@@ -229,20 +308,32 @@ $('rate').value = store.get('cdj_rate','1'); $('rateVal').textContent=(+$('rate'
 function speakNext(){
   if(!current || paused) return;
   if(current.idx >= current.sentences.length){ finishCurrent(); return; }
-  const u = new SpeechSynthesisUtterance(current.sentences[current.idx]);
+  const item = current.sentences[current.idx];
+  const myTok = current.token;
+  if(typeof item==='object' && item.pause){
+    let n=item.pause; quizUI('count', current.stop.id, n);
+    const tick=()=>{ if(!current||current.token!==myTok||paused) return; n--; if(n<=0){ current.idx++; speakNext(); } else { quizUI('count', current.stop.id, n); qTimer=setTimeout(tick,1000);} };
+    qTimer=setTimeout(tick,1000); return;
+  }
+  let text = item;
+  if(typeof item==='object'){ text=item.t; quizUI(item.quiz, current.stop.id); }
+  const u = new SpeechSynthesisUtterance(text);
   const v = voices.find(v=>v.name===$('voice').value); if(v){ u.voice=v; u.lang=v.lang; } else u.lang='en-US';
   u.rate = +$('rate').value;
   const myToken = current.token;
   u.onend = ()=>{ if(!current||current.token!==myToken||paused) return; current.idx++; speakNext(); };
   u.onerror = (e)=>{ if(!current||current.token!==myToken||paused) return; if(e.error==='interrupted'||e.error==='canceled') return; current.idx++; speakNext(); };
-  $('nowLine').textContent = current.sentences[current.idx];
+  $('nowLine').textContent = text;
   synth.speak(u);
 }
 function startStop(id){
   const stop = STOPS.find(s=>s.id===id); if(!stop) return;
   synth && synth.cancel();
   paused=false;
-  current = { stop, sentences: splitSentences(stop.text), idx:0, token:Math.random() };
+  const seq = splitSentences(stop.text);
+  if(QUIZ[id]){ seq.push({quiz:'ask', t:'Quiz time! '+QUIZ[id].ask}); seq.push({pause:8}); seq.push({quiz:'answer', t:'The answer: '+QUIZ[id].ans}); }
+  current = { stop, sentences: seq, idx:0, token:Math.random() };
+  showScene(id); quizUI('hide');
   played.add(id); store.set('cdj_played',[...played]);
   $('nowTitle').textContent = '🔊 '+stop.name; $('pauseBtn').textContent='Pause';
   ['pauseBtn','stopBtn','skipBtn'].forEach(b=>$(b).disabled=false);
@@ -251,7 +342,7 @@ function startStop(id){
   setTimeout(speakNext, 150);
 }
 function finishCurrent(){
-  current=null; $('nowTitle').textContent='Nothing playing'; $('nowLine').textContent='';
+  current=null; clearTimeout(qTimer); $('nowTitle').textContent='Nothing playing'; $('nowLine').textContent='';
   ['pauseBtn','stopBtn','skipBtn'].forEach(b=>$(b).disabled=true);
   if(queue.length){ const n=queue.shift(); setTimeout(()=>startStop(n),800); }
 }
@@ -315,7 +406,7 @@ if('serviceWorker' in navigator){
     if(!started) $('status').innerHTML = (navigator.serviceWorker.controller?'<span class="ok">Saved for offline use.</span> ':'Saving offline copy… ') + 'Tap Start when you leave the hotel.';
   }).catch(()=>{});
 }
-renderStops(); drawMap();
+showScene('drive1'); renderStops(); drawMap();
 </script>
 </body>
 </html>
