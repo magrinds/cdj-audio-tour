@@ -85,6 +85,8 @@
   a.mini { font-size:13px; font-weight:700; text-decoration:none; padding:6px 10px; border-radius:999px; background:#000; color:#fff; margin-left:4px; }
   a.mini.sec { background:#e6eefb; color:var(--deep); }
   .dest { display:flex; align-items:center; padding:8px 0; border-top:1px solid var(--line); } .dest .n { flex:1; font-size:14px; font-weight:600; } .dest .m { font-size:12px; color:var(--mute); font-weight:400; }
+  .warnbox { background:#fff7e6; border:1px solid #fcd38a; border-radius:14px; padding:10px 12px; margin-top:10px; font-size:14px; line-height:1.45; }
+  .warnbox b { color:#b45309; } .warnbox .pt { font-style:italic; color:var(--deep); }
 </style>
 </head>
 <body>
@@ -114,6 +116,7 @@
     <div style="font-size:13px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.04em">🚕 Next ride</div>
     <div id="rideTo" style="font-size:18px;font-weight:700;margin:4px 0 2px"></div>
     <div class="status" id="rideNote" style="margin-top:0"></div>
+    <div id="rideWarn" class="warnbox" style="display:none"></div>
     <div class="row" style="margin-top:10px"><a id="rideUber" class="btnlink">Open in Uber</a><a id="rideMaps" class="btnlink sec">Google Maps</a></div>
     <details style="margin-top:12px"><summary style="font-size:14px">Other destinations</summary><div id="rideList"></div></details>
   </div>
@@ -568,7 +571,7 @@ if('serviceWorker' in navigator){
 // ---------- rides ----------
 const DEST = {
   hotel:{name:"Hotel Le Renard", note:"Back to the hotel", lat:-22.7194257, lng:-45.5611975},
-  museum:{name:"Museu Felícia Leirner", note:"Open Tue to Sun, 9h to 18h", lat:-22.743852, lng:-45.632977},
+  museum:{name:"Museu Felícia Leirner", note:"Open Tue to Sun, 9h to 18h", lat:-22.743852, lng:-45.632977, remote:true},
   mosteiro:{name:"Mosteiro de São João (Abernéssia)", note:"Shop: 9h30 to 11h45, 13h30 to 14h45, 15h30 to 17h20", lat:-22.7362131, lng:-45.5958014},
   cezas:{name:"Ceza's Restaurante", note:"Lunch · pay-by-weight buffet · 11h to 15h30", lat:-22.7338056, lng:-45.5860889},
   joao:{name:"Restaurante do João", note:"Lunch · grilled plates · 8h to 16h", lat:-22.7400725, lng:-45.5925829},
@@ -576,6 +579,18 @@ const DEST = {
 };
 const uberUrl=d=>`https://m.uber.com/ul/?action=setPickup&pickup=my_location&dropoff[latitude]=${d.lat}&dropoff[longitude]=${d.lng}&dropoff[nickname]=${encodeURIComponent(d.name)}`;
 const mapsUrl=d=>`https://www.google.com/maps/dir/?api=1&destination=${d.lat},${d.lng}&travelmode=driving`;
+
+const PT_ASK = "Você pode voltar para nos buscar às ___? Podemos combinar pelo WhatsApp?";
+const WARN_GO = d => `<b>⚠️ Return rides may be hard to get.</b> ${d.name} is on the outskirts, and Uber pickups there aren't guaranteed, especially on weekdays. Before you leave the car:<br>• Ask your driver to come back at a set time and swap WhatsApp numbers:<br><span class="pt">"${PT_ASK}"</span> (Can you come back to pick us up at ___? Can we arrange it on WhatsApp?)<br>• Or schedule the return with Uber Reserve, if the app offers it (needs about 2 hours' notice).<br>• Backup: the 99 app, or call Le Renard's front desk, (12) 3669-2220, to send a taxi.`;
+const WARN_HERE = `<b>⚠️ You're at a spot where pickups can be slow.</b> Request your ride about 15 minutes before you want to leave, and check you have signal. If no car accepts, try the 99 app or call Le Renard, (12) 3669-2220, for a taxi.`;
+function rideWarning(k){
+  const d=DEST[k];
+  if(d.remote) return WARN_GO(d);
+  const atRemote = lastFix && Object.values(DEST).some(v=>v.remote && dist(lastFix.lat,lastFix.lng,v.lat,v.lng)<700);
+  if(atRemote || (played.has('felicia') && !played.has('palacio') && k==='mosteiro')) return WARN_HERE;
+  return '';
+}
+
 function nextRide(){
   if(!played.has('felicia')) return 'museum';
   if(!played.has('mosteiro')) return 'mosteiro';
@@ -587,7 +602,8 @@ function renderRide(){
   const away = lastFix ? ' · '+fmt(dist(lastFix.lat,lastFix.lng,d.lat,d.lng))+' away' : '';
   $('rideNote').textContent = d.note + away;
   $('rideUber').href=uberUrl(d); $('rideMaps').href=mapsUrl(d);
-  $('rideList').innerHTML = Object.entries(DEST).filter(([kk])=>kk!==k).map(([kk,v])=>`<div class="dest"><div class="n">${v.name}<div class="m">${v.note}</div></div><a class="mini" href="${uberUrl(v)}">Uber</a><a class="mini sec" href="${mapsUrl(v)}">Maps</a></div>`).join('');
+  const w=rideWarning(k); $('rideWarn').style.display=w?'block':'none'; $('rideWarn').innerHTML=w;
+  $('rideList').innerHTML = Object.entries(DEST).filter(([kk])=>kk!==k).map(([kk,v])=>`<div class="dest"><div class="n">${v.name}<div class="m">${v.note}</div></div>${v.remote?'<span title="Return rides may be hard" style="margin-right:4px">⚠️</span>':''}<a class="mini" href="${uberUrl(v)}">Uber</a><a class="mini sec" href="${mapsUrl(v)}">Maps</a></div>`).join('');
 }
 
 // ---------- photo album ----------
