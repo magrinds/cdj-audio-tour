@@ -79,6 +79,7 @@
   .vbar { position:absolute; left:0; right:0; bottom:24px; display:flex; gap:10px; justify-content:center; }
   .vmsg { position:absolute; top:20px; left:0; right:0; text-align:center; color:#fff; font-size:13px; }
   main { padding-bottom:100px; }
+  #reviewGrid div { cursor:pointer; } #reviewGrid div.off img { opacity:.25; filter:grayscale(1); } #reviewGrid .x { position:absolute; top:4px; right:4px; background:rgba(0,0,0,.6); color:#fff; border-radius:50%; width:22px; height:22px; display:flex; align-items:center; justify-content:center; font-size:13px; } #reviewGrid div.off .x { background:var(--accent2); }
 </style>
 </head>
 <body>
@@ -152,6 +153,12 @@
   <div class="row"><button id="takeBtn" style="flex:1">Take photo</button><button id="pickBtn" class="secondary" style="flex:1">From gallery</button></div>
   <div class="status" id="upStatus">Photos upload right away when you have signal, or wait safely on this phone until you do.</div>
   <div class="row" style="margin-top:12px"><button class="secondary" data-close="addSheet" style="flex:1">Close</button></div>
+</div></div>
+<div class="sheet" id="reviewSheet"><div class="panel">
+  <h2>Review your photos</h2>
+  <div class="status">Tap a photo to remove it. Only the ones you keep get uploaded.</div>
+  <div class="grid" id="reviewGrid"></div>
+  <div class="row" style="margin-top:14px"><button id="acceptBtn" style="flex:2">Upload</button><button id="rejectBtn" class="secondary" style="flex:1">Cancel</button></div>
 </div></div>
 <div class="sheet" id="albumSheet"><div class="panel">
   <div class="row" style="justify-content:space-between"><h2 style="margin:0">🖼 Tour album</h2><button class="secondary" data-close="albumSheet">Close</button></div>
@@ -553,10 +560,25 @@ async function shrink(file){
     return await new Promise(r=>c.toBlob(b=>r(b||file),'image/jpeg',0.82)); }catch(e){ return file; }
 }
 function nearestStop(){ if(!lastFix) return current?current.stop.id:'tour'; let best='tour',bd=1e9; for(const p of STOPS){ const d=dist(lastFix.lat,lastFix.lng,p.lat,p.lng); if(d<bd){bd=d;best=p.id;} } return bd<800?best:'tour'; }
+let review=[];
 async function addFiles(files){
+  if(!files.length) return;
+  $('addSheet').classList.remove('open');
+  $('reviewGrid').innerHTML='<div class="status">Preparing…</div>'; $('reviewSheet').classList.add('open');
+  review=[]; for(const f of files){ const blob=await shrink(f); review.push({blob, url:URL.createObjectURL(blob), keep:true}); }
+  renderReview();
+}
+function renderReview(){
+  $('reviewGrid').innerHTML = review.map((r,i)=>`<div data-i="${i}" class="${r.keep?'':'off'}"><img src="${r.url}"><span class="x">${r.keep?'✕':'↺'}</span></div>`).join('');
+  $('reviewGrid').querySelectorAll('[data-i]').forEach(d=>d.onclick=()=>{ const r=review[+d.dataset.i]; r.keep=!r.keep; renderReview(); });
+  const n=review.filter(r=>r.keep).length; $('acceptBtn').textContent = n? `Upload ${n} photo${n===1?'':'s'}` : 'Nothing selected'; $('acceptBtn').disabled=!n;
+}
+$('rejectBtn').onclick=()=>{ review.forEach(r=>URL.revokeObjectURL(r.url)); review=[]; $('reviewSheet').classList.remove('open'); };
+$('acceptBtn').onclick=async()=>{ const keep=review.filter(r=>r.keep).map(r=>r.blob); review.forEach(r=>URL.revokeObjectURL(r.url)); review=[]; $('reviewSheet').classList.remove('open'); $('addSheet').classList.add('open'); await queueBlobs(keep); };
+async function queueBlobs(blobs){
   const who=slug($('who').value); store.set('cdj_who',$('who').value);
   let n=0;
-  for(const f of files){ const blob=await shrink(f); const stop=current?current.stop.id:nearestStop();
+  for(const blob of blobs){ const stop=current?current.stop.id:nearestStop();
     const path=`${ALBUM}/${Date.now()}-${Math.random().toString(36).slice(2,6)}__${who}__${stop}.jpg`;
     try{ await qPut({path, blob, t:Date.now()}); n++; }catch(e){ $('upStatus').textContent='Could not save photo on this phone: '+e; } }
   $('upStatus').innerHTML=`<span class="ok">${n} photo${n===1?'':'s'} saved.</span> Uploading…`; updateBadge(); flush();
