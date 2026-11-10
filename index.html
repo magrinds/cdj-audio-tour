@@ -438,6 +438,16 @@ function drawMap(){
   svg.innerHTML=h;
 }
 
+
+// two-tap confirm when something is already playing (keyed, survives list redraws)
+let armed=null; // {key,label,until}
+function isArmed(key){ return armed && armed.key===key && Date.now()<armed.until; }
+function confirmTap(key, label, action, refresh){
+  if(isArmed(key)){ armed=null; action(); refresh&&refresh(); return; }
+  armed={key,label,until:Date.now()+3500}; refresh&&refresh();
+  setTimeout(()=>{ if(armed && armed.key===key && Date.now()>=armed.until){ armed=null; refresh&&refresh(); } }, 3600);
+}
+function armBtn(btn,key,label,orig){ if(isArmed(key)){ btn.innerHTML=label; btn.style.background='var(--accent2)'; btn.style.color='#fff'; } else { btn.innerHTML=orig; btn.style.background=''; btn.style.color=''; } }
 // ---------- stop list ----------
 function renderStops(){
   try{ renderRide(); }catch(e){}
@@ -447,10 +457,13 @@ function renderStops(){
     const trig = p.radius ? (p.walk? 'plays on arrival (walking)':'plays as you pass') : 'plays when you tap Start';
     return `<div class="stop"><div class="num ${done?'done':''}">${i+1}</div>
       <div class="info"><div class="name">${p.name}</div><div class="meta">${d?d+' away · ':''}${done?'played · ':''}${trig}</div></div>
-      <button data-play="${p.id}">▶</button></div>`;
+      <button data-play="${p.id}" ${isArmed('play:'+p.id)?'style="background:var(--accent2)"':''}>${isArmed('play:'+p.id)?armed.label:'▶'}</button></div>`;
   }).join('') + `<div style="margin-top:12px;font-weight:700;font-size:14px;color:var(--accent)">🚗 Stories for the road (auto-play while moving)</div>` +
-  FILLERS.map(f=>`<div class="stop"><div class="num ${played.has(f.id)?'done':''}">★</div><div class="info"><div class="name">${f.name.replace('Story: ','').replace(/^./,c=>c.toUpperCase())}</div><div class="meta">${played.has(f.id)?'played':'plays when nothing else is'}</div></div><button data-play="${f.id}">▶</button></div>`).join('');
-  document.querySelectorAll('[data-play]').forEach(b=>b.onclick=()=>{ unlockAudio(); playNow(b.dataset.play); });
+  FILLERS.map(f=>`<div class="stop"><div class="num ${played.has(f.id)?'done':''}">★</div><div class="info"><div class="name">${f.name.replace('Story: ','').replace(/^./,c=>c.toUpperCase())}</div><div class="meta">${played.has(f.id)?'played':'plays when nothing else is'}</div></div><button data-play="${f.id}" ${isArmed('play:'+f.id)?'style="background:var(--accent2)"':''}>${isArmed('play:'+f.id)?armed.label:'▶'}</button></div>`).join('');
+  document.querySelectorAll('[data-play]').forEach(b=>b.onclick=()=>{ unlockAudio();
+    const id=b.dataset.play;
+    if(current){ confirmTap('play:'+id, current.stop.id===id?'Restart?':'Switch?', ()=>playNow(id), renderStops); return; }
+    playNow(id); });
 }
 $('scripts').innerHTML = STOPS.concat(FILLERS).map((p,i)=>`<h3 style="margin:14px 0 0;font-size:15px">${i+1}. ${p.name}</h3><div class="script">${p.text}</div>`).join('');
 
@@ -545,8 +558,10 @@ function rewind(){ if(!current) return;
 $('rewBtn').onclick=rewind;
 function syncPause(){ const f=$('fabPause'); f.style.display=current?'':'none'; $('fabRew').style.display=current?'':'none'; $('rewBtn').disabled=!current; f.textContent=paused?'▶ Resume':'⏸ Pause'; f.classList.toggle('resume',paused); }
 $('pauseBtn').onclick=togglePause; $('fabPause').onclick=togglePause; $('fabRew').onclick=rewind;
-$('stopBtn').onclick = ()=>{ queue=[]; synth && synth.cancel(); current=null; paused=false; finishCurrent(); };
-$('skipBtn').onclick = ()=>{ synth && synth.cancel(); current=null; paused=false; finishCurrent(); };
+$('stopBtn').onclick = ()=>confirmTap('stop','Stop?',doStop,()=>armBtn($('stopBtn'),'stop','Stop?','Stop'));
+function doStop(){ queue=[]; synth && synth.cancel(); current=null; paused=false; finishCurrent(); }
+$('skipBtn').onclick = ()=>confirmTap('skip','Skip?',doSkip,()=>armBtn($('skipBtn'),'skip','Skip?','Skip ▸'));
+function doSkip(){ synth && synth.cancel(); current=null; paused=false; finishCurrent(); };
 $('testVoice').onclick = ()=>{ unlockAudio(); synth.cancel(); const u=new SpeechSynthesisUtterance('Bem-vindo! Welcome to Campos do Jordão.'); const v=voices.find(v=>v.name===$('voice').value); if(v){u.voice=v;u.lang=v.lang;} u.rate=+$('rate').value; synth.speak(u); };
 $('resetPlayed').onclick = ()=>{ played=new Set(); store.set('cdj_played',[]); renderStops(); drawMap(); };
 
@@ -601,6 +616,8 @@ $('start').onclick = async ()=>{
     const sw = navigator.serviceWorker && navigator.serviceWorker.controller;
     $('status').innerHTML = `${sw?'<span class="ok">Saved for offline use.</span>':'Offline copy is being saved; reload once while online to be sure.'} Screen will stay on while this page is open.`;
   }
+  if(!$('start').dataset.orig) $('start').dataset.orig=$('start').innerHTML;
+  if(current && current.stop.id!=='drive1'){ confirmTap('start','Replay intro? Tap again', ()=>{ playNow('drive1'); saveState(); }, ()=>armBtn($('start'),'start','Replay intro? Tap again',$('start').dataset.orig||'Tour running')); return; }
   playNow('drive1'); saveState();
 };
 
