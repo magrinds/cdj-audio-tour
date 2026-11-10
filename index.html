@@ -557,7 +557,7 @@ function renderStops(){
   const walkRows = WALKSTORIES.map(f=>row(f.id,'👣', f.name.replace('Walk: ','').replace(/^./,c=>c.toUpperCase()), played.has(f.id)?'played':'plays while walking, between stops', played.has(f.id))).join('');
   const roadRows = FILLERS.map(f=>row(f.id,'★', f.name.replace('Story: ','').replace(/^./,c=>c.toUpperCase()), played.has(f.id)?'played':'plays when nothing else is', played.has(f.id))).join('');
   const cnt=(arr)=>`${arr.filter(x=>played.has(x.id)).length}/${arr.length}`;
-  const open = store.get('cdj_open', {});
+  const open = store.get('cdj_open2', {});
   const isOpen=(k,auto)=> open[k]!==undefined ? open[k] : auto;
   const sec=(k,title,arr,rows,auto)=>`<details class="sec" data-sec="${k}" ${isOpen(k,auto)?'open':''}><summary><span>${title}</span><span class="cnt">${cnt(arr)} played</span></summary>${rows || '<div class="status">All played. Long-press a stop to reset it, or turn off Hide played.</div>'}</details>`;
   // up next: first unplayed eligible tour stop by order
@@ -565,12 +565,12 @@ function renderStops(){
   $('stops').innerHTML =
     (next ? `<div class="upnext"><div class="lbl">Up next</div>${row(next.id,'▸',next.name, (lastFix?fmt(dist(lastFix.lat,lastFix.lng,next.lat,next.lng))+' away · ':'')+(next.radius?(next.walk?'plays on arrival':'plays as you pass'):'tap to play'), false)}</div>` : '') +
     `<label class="hidep"><input type="checkbox" id="hidePlayed" ${hide?'checked':''}> Hide played (uncheck to replay or reset)</label>` +
-    sec('tour','📍 Tour stops',STOPS,tourRows,!nearMuseum) +
+    sec('tour','📍 Tour stops',STOPS,tourRows,false) +
     sec('museum','🗿 Museum walk',MUSEUM,musRows,nearMuseum) +
     sec('walk','🚶 Walking stories',WALKSTORIES,walkRows,false) +
     sec('road','🚗 Road stories',FILLERS,roadRows,false);
   $('hidePlayed').onchange=()=>{ store.set('cdj_hideplayed',$('hidePlayed').checked); renderStops(); };
-  $('stops').querySelectorAll('details.sec').forEach(d=>d.addEventListener('toggle',()=>{ const o=store.get('cdj_open',{}); o[d.dataset.sec]=d.open; store.set('cdj_open',o); }));
+  $('stops').querySelectorAll('details.sec').forEach(d=>d.addEventListener('toggle',()=>{ const o=store.get('cdj_open2',{}); o[d.dataset.sec]=d.open; store.set('cdj_open2',o); }));
   document.querySelectorAll('[data-play]').forEach(b=>b.onclick=()=>{ if(Date.now()<suppressClickUntil) return; unlockAudio();
     const id=b.dataset.play;
     if(current){ confirmTap('play:'+id, current.stop.id===id?'Restart?':'Switch?', ()=>playNow(id), renderStops); return; }
