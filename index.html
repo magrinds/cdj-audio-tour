@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#1f3b2d">
+<link rel="manifest" href="manifest.json">
+<title>Campos do Jordão Audio Tour</title>
+<style>
+  :root { --bg:#f6f3ec; --ink:#1d2420; --mute:#6b726d; --accent:#1f3b2d; --accent2:#c7652b; --card:#fff; --line:#e3ddd0; }
+  * { box-sizing:border-box; }
+  body { margin:0; font-family:-apple-system,system-ui,Segoe UI,Roboto,sans-serif; background:var(--bg); color:var(--ink); }
+  header { background:var(--accent); color:#fff; padding:14px 16px; position:sticky; top:0; z-index:5; }
+  header h1 { margin:0; font-size:18px; }
+  header .sub { font-size:12px; opacity:.85; margin-top:2px; }
+  main { padding:12px; max-width:640px; margin:0 auto; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:12px; margin-bottom:12px; }
+  button { font:inherit; border:0; border-radius:10px; padding:10px 14px; background:var(--accent); color:#fff; font-weight:600; }
+  button.secondary { background:#e9e4d8; color:var(--ink); }
+  button.warn { background:var(--accent2); }
+  button:disabled { opacity:.45; }
+  .row { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+  #start { width:100%; font-size:18px; padding:16px; }
+  .status { font-size:13px; color:var(--mute); margin-top:8px; line-height:1.4; }
+  .ok { color:#2c7a3f; font-weight:600; } .bad { color:#b3261e; font-weight:600; }
+  #now { font-size:15px; }
+  #now .title { font-weight:700; }
+  #now .line { color:var(--mute); font-size:13px; margin-top:4px; min-height:2.6em; }
+  svg { width:100%; height:auto; background:#e8efe6; border-radius:10px; display:block; }
+  .stop { display:flex; gap:10px; align-items:center; padding:10px 0; border-top:1px solid var(--line); }
+  .stop:first-child { border-top:0; }
+  .num { width:28px; height:28px; border-radius:50%; background:var(--accent); color:#fff; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:13px; flex:none; }
+  .num.done { background:#9aa79f; }
+  .stop .info { flex:1; min-width:0; }
+  .stop .name { font-weight:600; font-size:15px; }
+  .stop .meta { font-size:12px; color:var(--mute); }
+  .stop button { padding:8px 12px; }
+  label { font-size:13px; color:var(--mute); }
+  select, input[type=range] { width:100%; }
+  details summary { cursor:pointer; font-weight:600; }
+  .script { font-size:14px; line-height:1.5; white-space:pre-wrap; color:#333; margin-top:8px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Campos do Jordão Audio Tour</h1>
+  <div class="sub">GPS-triggered narration · works offline once loaded</div>
+</header>
+<main>
+  <div class="card">
+    <button id="start">▶ Start tour</button>
+    <div class="status" id="status">Tap Start to enable GPS, audio, and keep-screen-on. Then you can switch on airplane mode to test offline.</div>
+  </div>
+
+  <div class="card" id="now">
+    <div class="title" id="nowTitle">Nothing playing</div>
+    <div class="line" id="nowLine"></div>
+    <div class="row" style="margin-top:8px">
+      <button id="pauseBtn" class="secondary" disabled>Pause</button>
+      <button id="stopBtn" class="secondary" disabled>Stop</button>
+      <button id="skipBtn" class="secondary" disabled>Skip ▸</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <svg id="map" viewBox="0 0 400 260"></svg>
+    <div class="status" id="gpsInfo">GPS: off</div>
+  </div>
+
+  <div class="card">
+    <div id="stops"></div>
+  </div>
+
+  <div class="card">
+    <div class="row" style="justify-content:space-between">
+      <label style="flex:1">Auto-play when you arrive</label>
+      <input type="checkbox" id="auto" checked style="width:22px;height:22px">
+    </div>
+    <label for="voice">Voice</label>
+    <select id="voice"></select>
+    <label for="rate" style="display:block;margin-top:8px">Speed: <span id="rateVal">1.0</span>×</label>
+    <input type="range" id="rate" min="0.7" max="1.4" step="0.05" value="1">
+    <div class="row" style="margin-top:10px">
+      <button class="secondary" id="testVoice">Test voice</button>
+      <button class="secondary" id="resetPlayed">Reset played stops</button>
+    </div>
+    <div class="status">Tips: keep this page open and the screen on (the app requests it). Both phones run independently on their own GPS. Pick a voice marked "offline" if available.</div>
+  </div>
+
+  <div class="card">
+    <details>
+      <summary>Read the full script</summary>
+      <div id="scripts"></div>
+    </details>
+  </div>
+</main>
+
+<script>
+const STOPS = [
+ { id:"drive1", name:"Drive up to Alto da Boa Vista", lat:-22.7194257, lng:-45.5611975, radius:0, walk:false, mapLabel:"Hotel",
+   text:`Welcome to Campos do Jordão, the highest city in Brazil, at roughly one thousand six hundred and twenty eight meters. That's higher than Denver. As we climb out of Capivari, look at the chalets, the half-timbered facades, and the French hotel names. It's a deliberate European illusion, but the town has a very Brazilian story underneath.
+The name first. The land once belonged to a brigadier named Jordão. He bought a ranch called Fazenda Bonsucesso and renamed it Natal, but everyone simply called it "os Campos do Jordão": Jordão's fields. Back then it was customary to attach the owner's name to the property. So, loosely translated, you are staying in Jordan's Pasture.
+The official founding came in 1874, when Mateus da Costa Pinto formed a small settlement called Vila de São Mateus de Imbiri, named after a nearby stream. It took a long time to grow up. Campos do Jordão only became its own independent municipality in 1934.
+Now look up at the trees. Those tall pines shaped like candelabras are Araucarias, the signature tree of the Serra da Mantiqueira mountains. Their seed, called pinhão, is a beloved winter snack here, boiled or roasted. It's out of season in November, but if you see pinhão on a menu, now you know.
+Our first stop is an outdoor sculpture museum set in native forest. Enjoy the ride.` },
+
+ { id:"felicia", name:"Museu Felícia Leirner", lat:-22.743852, lng:-45.632977, radius:130, walk:true, mapLabel:"Museum",
+   text:`Welcome to the Felícia Leirner Museum. Nearly ninety sculptures, in bronze, white cement, and granite, are set outdoors along these forest paths.
+The artist's story is wonderful. Felícia, Feiga in the original Polish, was born in Warsaw in 1904 to a family of modest means. Her son remembered that she sang in the chorus of the Warsaw Opera, and that's where his father fell in love with her. She arrived in Brazil in 1927.
+Here's the inspiring part. For two decades she was a São Paulo wife and mother of three. Then, at age forty four, she began studying sculpture with Victor Brecheret, the most famous modernist sculptor in Brazil. Fifteen years later, in 1963, she won Best Brazilian Sculptor at the São Paulo Biennial. Her work is now in collections including the Hermitage in Russia. Never too late.
+Why here? In 1962, shaken by her husband's death, she moved from São Paulo to Campos do Jordão and brought her work with her. She donated the sculptures, and this museum officially opened in 1979. She lived here until she died in 1996, at ninety two.
+As you walk, notice how the pieces change. In the 1950s her themes were motherhood and family. Later she moved into abstraction. She placed many pieces herself, choosing spots in the forest that suited each one. She also wrote poetry, published after her death.
+And look around at the forest itself. This is a remnant of the Atlantic Forest, the Mata Atlântica, which once covered Brazil's coast and is now one of the most threatened ecosystems on Earth. You are walking through something rare.` },
+
+ { id:"auditorio", name:"Auditório Claudio Santoro", lat:-22.7427005, lng:-45.6336612, radius:70, walk:true, mapLabel:"",
+   text:`That big building of glass and stone is the Claudio Santoro Auditorium. It seats eight hundred and fourteen people, and it's the main stage of the Campos do Jordão International Winter Festival, the biggest classical music event in Latin America.
+The festival actually started in 1970 inside the Governor's Palace, which we'll pass on the way down. It grew so popular that it needed its own hall. Construction began here in 1975, and the auditorium opened in 1979.
+The namesake has a dramatic story. Claudio Santoro was a composer and conductor born in Manaus, deep in the Amazon. On March twenty seventh, 1989, he was in Brasília conducting the dress rehearsal for the season's first concert, a tribute to the two hundredth anniversary of the French Revolution, when he suffered a massive heart attack on stage. He was sixty nine. He died doing exactly what he loved. That same year, this auditorium and the National Theater in Brasília were both renamed in his honor.
+A fun fact for bossa nova fans: Santoro wrote thirteen songs with the poet Vinícius de Moraes, the lyricist of The Girl from Ipanema.
+If the doors are open, peek inside. The steep seating gives every seat a great view of the stage.` },
+
+ { id:"palacio", name:"Palácio Boa Vista (drive-by)", lat:-22.7359333, lng:-45.6127636, radius:350, walk:false, mapLabel:"Palácio",
+   text:`Coming up is the Palácio Boa Vista, the official winter residence of the Governor of São Paulo. It's closed on Mondays and Tuesdays, so today we're admiring it from the road.
+It was a twenty six year construction project. Work started in 1938, ordered by Adhemar de Barros, who was then the federally appointed administrator of São Paulo. It was finished only in 1964, and Adhemar inaugurated it himself on July twenty first, 1964, by then as the elected governor.
+Adhemar de Barros is one of the most colorful figures in Brazilian politics. He was a populist builder, and his supporters' unofficial slogan was "rouba, mas faz," which means "he steals, but he gets things done." Brazilians still use that phrase today for that type of politician. Starting a palace as an appointee and finishing it a quarter century later as governor is a fitting monument to the man. And yes, the avenue we're driving on is named after him too.
+Inside are about three thousand two hundred square meters, thirty five spaces and one hundred and five rooms, with furniture from the seventeenth to the twentieth centuries, porcelain, silver, heavy velvet curtains, and art including Tarsila do Amaral, Brazil's most famous modernist painter. A funny detail: because the governor still uses it, especially on weekends, phones and cameras are not allowed inside.
+In 1970 it was declared a public monument and opened to visitors, and that same year its grand hall hosted the first winter concerts, which grew into the festival we just learned about. If you're still in town Wednesday through Sunday, the guided tour is free.` },
+
+ { id:"tb", name:"The tuberculosis story (drive down)", lat:-22.7365, lng:-45.6045, radius:400, walk:false, mapLabel:"",
+   text:`As we drive downhill, here's the big story nobody tells you in Capivari. This town exists because of tuberculosis.
+In the early twentieth century, the sanitarian doctor Emílio Ribas, who had studied the disease in Europe, decided the cold, dry mountain air of the Mantiqueira was the ideal place for sanatoriums. The fresh air was the treatment.
+The problem was getting sick people up the mountain. Before the railway, the climb was made on foot, on horseback, or in litters carried by enslaved people. So Ribas and his colleague Victor Godinho built a railway. It opened on November fifteenth, 1914, and runs forty seven kilometers, climbing from five hundred and fifty five meters in the Paraíba Valley to nearly one thousand six hundred meters here. A medical footnote: despite Ribas doing much of the pioneering work, history mostly credits Oswaldo Cruz for those public health campaigns. The railway is in the news again, by the way. The state is handing it to a private operator, with plans to bring back the Maria Fumaça steam train.
+The town filled with patients. By the mid 1940s there were fourteen sanatoriums, plus dozens of boarding houses that were never enough. The town was even run as a special "sanitary prefecture" starting in 1926. There's a famous Brazilian novel, Floradas na Serra, about the lives of patients recovering in these boarding houses.
+Then, from the 1950s on, antibiotics defeated tuberculosis, and the town lost its reason to exist. So it reinvented itself as a mountain resort, and leaned into Swiss and German architecture to attract tourists. The Brazilian Switzerland is the rebrand of a former hospital town.` },
+
+ { id:"abernessia", name:"Vila Abernéssia", lat:-22.7382467, lng:-45.5919284, radius:300, walk:false, mapLabel:"Abernéssia",
+   text:`Welcome to Abernéssia, the Scottish neighborhood. This district was built by a Scottish engineer named Robert John Reid, born in Aberdeen and educated at Oxford. He was a very tall man, and he used to walk around town wearing a traditional kilt. Picture that in rural Brazil a hundred years ago.
+The name Abernéssia doesn't exist in Scotland. Reid invented it. A local historian says it blends Aberdeen, where Reid was born, Inverness, and Escócia, the Portuguese word for Scotland. The area used to be called simply Vila Nova, the New Village. Then Reid donated land for the train station and insisted it carry the same name as his own property. Classic move: donate the land, name the station.
+He was paid for his surveying work in land, and as that historian put it, he became very rich in land, but at the time land up here was worth almost nothing. His heirs probably feel differently today.
+Look for the Abernéssia train station. It first opened in 1919 and was rebuilt in 1975, in a style that recalls old Scottish railway stations.
+This is the real working town. City hall, the courthouse, the municipal market, pharmacies and shops are here, and this is also where most of the old sanatoriums stood. Capivari's Swiss look is the top layer. Underneath is this older town of Scots, doctors, and patients.
+Today the local economy runs almost entirely on tourism, especially in July, when the Winter Festival and the cold weather crowds from São Paulo fill the town. Local specialties include trout farmed in the mountain streams, artisanal chocolate, and craft beer. Enjoy lunch.` },
+
+ { id:"mosteiro", name:"Mosteiro de São João", lat:-22.7362131, lng:-45.5958014, radius:90, walk:true, mapLabel:"Mosteiro",
+   text:`Welcome to the Monastery of Saint John, home to Benedictine nuns. They belong to the oldest religious order in the Western world, founded by Saint Benedict in Italy in the year 529.
+The monastery was founded in 1964, the same year the Governor's Palace up the hill was finished, on the very same avenue. That year the governor got his palace and the nuns got their monastery.
+The Benedictine motto is "ora et labora," pray and work, and the shop is the work part. By tradition, the nuns live from their own labor: cookies, breads, cakes, jams, and handicrafts. There's a social side too. Through a "Mothers' Club," women from low income families learn crafts and help the nuns make the sweets sold in the shop.
+A shopping tip for anyone watching saturated fat: the nuns' jams, called geleias, are essentially fat free. Pair them with plain bread rather than the butter cakes. The shop also sells famous handmade chocolates made by Trappist nuns in Santa Catarina, so that's nun to nun chocolate, from more than five hundred kilometers away.
+Wander down the path through the cypress grove to the little lake and the grotto. It's a place made for slowing down.
+And if you're still in town at a quarter to six this evening, the nuns sing Vespers in the chapel, with Gregorian chant in Latin, Greek, and Portuguese. It's free and open to everyone. The shop closes for a break from about a quarter to three until half past three, so shop first.
+Thank you for joining the tour. I hope Campos do Jordão now feels like more than chocolate and chalets.` }
+];
+
+// ---------- state ----------
+const $ = id => document.getElementById(id);
+const store = { get(k,d){ try{ const v=localStorage.getItem(k); return v===null?d:JSON.parse(v);}catch(e){return d;} },
+                set(k,v){ try{ localStorage.setItem(k,JSON.stringify(v)); }catch(e){} } };
+let played = new Set(store.get('cdj_played', []));
+let queue = [];          // stop ids waiting
+let current = null;      // {stop, sentences, idx}
+let paused = false;
+let voices = [];
+let lastFix = null, prevFix = null;
+let started = false;
+let wakeLock = null;
+const synth = window.speechSynthesis;
+
+// ---------- geo helpers ----------
+function dist(a,b,c,d){ const R=6371000, t=Math.PI/180; const dLa=(c-a)*t, dLo=(d-b)*t;
+  const x=Math.sin(dLa/2)**2+Math.cos(a*t)*Math.cos(c*t)*Math.sin(dLo/2)**2; return 2*R*Math.asin(Math.sqrt(x)); }
+function fmt(m){ return m<1000? Math.round(m)+' m' : (m/1000).toFixed(1)+' km'; }
+
+// ---------- map ----------
+const pts = STOPS.concat([]);
+const lats = pts.map(p=>p.lat), lngs = pts.map(p=>p.lng);
+const pad = 0.004;
+const minLat=Math.min(...lats)-pad, maxLat=Math.max(...lats)+pad, minLng=Math.min(...lngs)-pad, maxLng=Math.max(...lngs)+pad;
+const W=400, H=260;
+const kx = Math.cos(-22.73*Math.PI/180);
+const sx = W/((maxLng-minLng)*kx), sy = H/(maxLat-minLat), s=Math.min(sx,sy);
+const ox = (W-(maxLng-minLng)*kx*s)/2, oy=(H-(maxLat-minLat)*s)/2;
+function proj(lat,lng){ return [ox+(lng-minLng)*kx*s, oy+(maxLat-lat)*s]; }
+function drawMap(){
+  const svg=$('map'); let h='';
+  const route = ['drive1','felicia','palacio','tb','mosteiro','abernessia'].map(id=>STOPS.find(x=>x.id===id));
+  h+=`<polyline points="${route.map(p=>proj(p.lat,p.lng).join(',')).join(' ')}" fill="none" stroke="#7d9a86" stroke-width="3" stroke-dasharray="6 5"/>`;
+  STOPS.forEach((p,i)=>{ const [x,y]=proj(p.lat,p.lng);
+    if(p.radius>0){ const r=Math.max(4,p.radius*s/111320); h+=`<circle cx="${x}" cy="${y}" r="${r}" fill="#1f3b2d" opacity=".08"/>`; }
+    const done=played.has(p.id);
+    h+=`<circle cx="${x}" cy="${y}" r="9" fill="${done?'#9aa79f':'#1f3b2d'}"/><text x="${x}" y="${y+4}" text-anchor="middle" font-size="10" font-weight="700" fill="#fff">${i+1}</text>`;
+    if(p.mapLabel){ const below=(p.id==='abernessia'); h+=`<text x="${x}" y="${below?y+23:y-13}" text-anchor="middle" font-size="11" fill="#1d2420">${p.mapLabel}</text>`; }
+  });
+  if(lastFix){ const [x,y]=proj(lastFix.lat,lastFix.lng);
+    const inside = x>-20&&x<W+20&&y>-20&&y<H+20;
+    if(inside){ h+=`<circle cx="${x}" cy="${y}" r="14" fill="#2b6cb0" opacity=".2"/><circle cx="${x}" cy="${y}" r="6" fill="#2b6cb0" stroke="#fff" stroke-width="2"/>`; }
+  }
+  svg.innerHTML=h;
+}
+
+// ---------- stop list ----------
+function renderStops(){
+  $('stops').innerHTML = STOPS.map((p,i)=>{
+    const d = lastFix ? fmt(dist(lastFix.lat,lastFix.lng,p.lat,p.lng)) : '';
+    const done = played.has(p.id);
+    const trig = p.radius ? (p.walk? 'plays on arrival (walking)':'plays as you pass') : 'plays when you tap Start';
+    return `<div class="stop"><div class="num ${done?'done':''}">${i+1}</div>
+      <div class="info"><div class="name">${p.name}</div><div class="meta">${d?d+' away · ':''}${done?'played · ':''}${trig}</div></div>
+      <button data-play="${p.id}">▶</button></div>`;
+  }).join('');
+  document.querySelectorAll('[data-play]').forEach(b=>b.onclick=()=>{ unlockAudio(); playNow(b.dataset.play); });
+}
+$('scripts').innerHTML = STOPS.map((p,i)=>`<h3 style="margin:14px 0 0;font-size:15px">${i+1}. ${p.name}</h3><div class="script">${p.text}</div>`).join('');
+
+// ---------- speech ----------
+function splitSentences(t){ return t.replace(/\n+/g,' ').match(/[^.!?]+[.!?]+["”]?|[^.!?]+$/g).map(s=>s.trim()).filter(Boolean); }
+function loadVoices(){
+  voices = synth ? synth.getVoices() : [];
+  const en = voices.filter(v=>/^en/i.test(v.lang));
+  const list = en.length?en:voices;
+  const saved = store.get('cdj_voice', null);
+  $('voice').innerHTML = list.map(v=>`<option value="${v.name}" ${v.name===saved?'selected':''}>${v.name} (${v.lang})${v.localService?' · offline':''}</option>`).join('');
+  if(!saved){ const pref = list.find(v=>v.localService && /en[-_]US/i.test(v.lang)) || list.find(v=>v.localService) || list[0]; if(pref) $('voice').value=pref.name; }
+}
+if(synth){ loadVoices(); synth.onvoiceschanged = loadVoices; }
+$('voice').onchange = ()=>store.set('cdj_voice',$('voice').value);
+$('rate').oninput = ()=>{ $('rateVal').textContent=(+$('rate').value).toFixed(2); store.set('cdj_rate',$('rate').value); };
+$('rate').value = store.get('cdj_rate','1'); $('rateVal').textContent=(+$('rate').value).toFixed(2);
+
+function speakNext(){
+  if(!current || paused) return;
+  if(current.idx >= current.sentences.length){ finishCurrent(); return; }
+  const u = new SpeechSynthesisUtterance(current.sentences[current.idx]);
+  const v = voices.find(v=>v.name===$('voice').value); if(v){ u.voice=v; u.lang=v.lang; } else u.lang='en-US';
+  u.rate = +$('rate').value;
+  const myToken = current.token;
+  u.onend = ()=>{ if(!current||current.token!==myToken||paused) return; current.idx++; speakNext(); };
+  u.onerror = (e)=>{ if(!current||current.token!==myToken||paused) return; if(e.error==='interrupted'||e.error==='canceled') return; current.idx++; speakNext(); };
+  $('nowLine').textContent = current.sentences[current.idx];
+  synth.speak(u);
+}
+function startStop(id){
+  const stop = STOPS.find(s=>s.id===id); if(!stop) return;
+  synth && synth.cancel();
+  paused=false;
+  current = { stop, sentences: splitSentences(stop.text), idx:0, token:Math.random() };
+  played.add(id); store.set('cdj_played',[...played]);
+  $('nowTitle').textContent = '🔊 '+stop.name; $('pauseBtn').textContent='Pause';
+  ['pauseBtn','stopBtn','skipBtn'].forEach(b=>$(b).disabled=false);
+  renderStops(); drawMap();
+  if(!synth){ $('nowLine').textContent='Speech not supported in this browser.'; return; }
+  setTimeout(speakNext, 150);
+}
+function finishCurrent(){
+  current=null; $('nowTitle').textContent='Nothing playing'; $('nowLine').textContent='';
+  ['pauseBtn','stopBtn','skipBtn'].forEach(b=>$(b).disabled=true);
+  if(queue.length){ const n=queue.shift(); setTimeout(()=>startStop(n),800); }
+}
+function playNow(id){ queue = queue.filter(q=>q!==id); startStop(id); }
+function enqueue(id){
+  if(played.has(id) || queue.includes(id) || (current && current.stop.id===id)) return;
+  if(!current) startStop(id); else queue.push(id);
+}
+$('pauseBtn').onclick = ()=>{ if(!current) return;
+  if(!paused){ paused=true; synth.cancel(); $('pauseBtn').textContent='Resume'; }
+  else { paused=false; $('pauseBtn').textContent='Pause'; current.token=Math.random(); speakNext(); } };
+$('stopBtn').onclick = ()=>{ queue=[]; synth && synth.cancel(); current=null; paused=false; finishCurrent(); };
+$('skipBtn').onclick = ()=>{ synth && synth.cancel(); current=null; paused=false; finishCurrent(); };
+$('testVoice').onclick = ()=>{ unlockAudio(); synth.cancel(); const u=new SpeechSynthesisUtterance('Bem-vindo! Welcome to Campos do Jordão.'); const v=voices.find(v=>v.name===$('voice').value); if(v){u.voice=v;u.lang=v.lang;} u.rate=+$('rate').value; synth.speak(u); };
+$('resetPlayed').onclick = ()=>{ played=new Set(); store.set('cdj_played',[]); renderStops(); drawMap(); };
+
+let unlocked=false;
+function unlockAudio(){ if(unlocked||!synth) return; const u=new SpeechSynthesisUtterance(' '); u.volume=0; synth.speak(u); unlocked=true; }
+
+// ---------- GPS ----------
+function onFix(pos){
+  const c=pos.coords; prevFix=lastFix;
+  lastFix={lat:c.latitude,lng:c.longitude,acc:c.accuracy,t:pos.timestamp,speed:c.speed};
+  let spd = (c.speed!=null && !isNaN(c.speed)) ? c.speed : null;
+  if(spd===null && prevFix){ const dt=(lastFix.t-prevFix.t)/1000; if(dt>0) spd=dist(prevFix.lat,prevFix.lng,lastFix.lat,lastFix.lng)/dt; }
+  $('gpsInfo').innerHTML = `GPS: <span class="ok">on</span> · accuracy ±${Math.round(c.accuracy)} m${spd!=null?' · '+(spd*3.6).toFixed(0)+' km/h':''}`;
+  if($('auto').checked && c.accuracy<120){
+    for(const p of STOPS){
+      if(!p.radius || played.has(p.id)) continue;
+      const d=dist(c.latitude,c.longitude,p.lat,p.lng);
+      if(d<=p.radius){
+        if(p.walk && spd!=null && spd>3.5) continue; // still in a car, wait until walking
+        enqueue(p.id);
+      }
+    }
+  }
+  renderStops(); drawMap();
+}
+function onGeoErr(e){ $('gpsInfo').innerHTML = `GPS: <span class="bad">${e.message||'unavailable'}</span>. You can still tap ▶ on any stop.`; }
+
+async function keepAwake(){ try{ if('wakeLock' in navigator){ wakeLock = await navigator.wakeLock.request('screen'); } }catch(e){} }
+document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='visible' && started) keepAwake(); });
+
+$('start').onclick = async ()=>{
+  unlockAudio();
+  if(!started){
+    started=true;
+    $('start').textContent='Tour running'; $('start').classList.add('secondary');
+    await keepAwake();
+    if('geolocation' in navigator){ navigator.geolocation.watchPosition(onFix,onGeoErr,{enableHighAccuracy:true,maximumAge:5000,timeout:30000}); }
+    else onGeoErr({message:'not supported'});
+    const sw = navigator.serviceWorker && navigator.serviceWorker.controller;
+    $('status').innerHTML = `${sw?'<span class="ok">Saved for offline use.</span>':'Offline copy is being saved; reload once while online to be sure.'} Screen will stay on while this page is open.`;
+    if(!played.has('drive1')) startStop('drive1');
+  }
+};
+
+// ---------- offline ----------
+if('serviceWorker' in navigator){
+  navigator.serviceWorker.register('sw.js').then(()=>{
+    if(!started) $('status').innerHTML = (navigator.serviceWorker.controller?'<span class="ok">Saved for offline use.</span> ':'Saving offline copy… ') + 'Tap Start when you leave the hotel.';
+  }).catch(()=>{});
+}
+renderStops(); drawMap();
+</script>
+</body>
+</html>
