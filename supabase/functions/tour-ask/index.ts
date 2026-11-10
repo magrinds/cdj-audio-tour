@@ -1,7 +1,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 
 // Right Here, Right Now: one function for the guide.
-//   mode "ask" (default): answer a question, or propose a new plan via the update_plan tool
+//   mode "ask" (default): answer a question (with web search), or propose a new plan via the update_plan tool
 //   mode "create": write a whole new tour, geocode it, save it to rhrn_tours
 //   mode "save_plan": store the group's current plan in rhrn_tour_plans
 
@@ -25,7 +25,8 @@ ${VOICE}
 - Answers: 2 to 5 short spoken sentences.
 - Resolve references like "she", "that place", "our hotel", "the museum we went to" using the trip facts, the tour overview, what they have already heard, and the recent conversation.
 - Use the tour notes first, then your own general knowledge. Answer confidently with well-known facts. Do not say you lack details when the tour notes or common knowledge cover it.
-- Only hedge on things that change: opening hours, prices, current events, whether a place is open right now.
+- You have a web_search tool. Use it when the guest asks you to check or look something up, when they ask for specific facts you are not sure of (dates, names, numbers), and for things that change (opening hours, prices, events, whether a place is open now). Search in Portuguese or the local language when that finds better local sources. Do not search for things the tour notes already answer. Never mention sources, links or that you searched unless asked; just give the answer naturally.
+- If you still cannot confirm something after searching, say so briefly.
 - Use their GPS location and local time when relevant.
 - Answer in the language the guest used.
 
@@ -33,7 +34,7 @@ CHANGING THE PLAN: If the guest asks to change today's plan (skip, add, swap, re
 - PLAN lists the stops in order with their ids. Stops marked played are done; never list them.
 - In update_plan.plan list ONLY the remaining stops, in the new order: {"id": "..."} for an existing stop, or {"new": {...}} for a new place. Leave a stop out to remove it. Stops in REMOVED can be brought back by id.
 - Do the time math. Walking is about 4 km per hour; a ride in town is about 25 km per hour plus 5 to 10 minutes to get a car; allow realistic visit times. If a time limit makes something impossible, drop the lowest value stops and say so.
-- New places must be real places you are confident exist near the route. Give your best latitude and longitude and a precise place_query (name, street, neighborhood, city) for the geocoder. Write each new stop's narration (80 to 160 words, same spoken style as the tour: what it is, a bit of history or a story, what to look for, one practical tip; mention that hours should be checked if it is a shop or restaurant).
+- New places must be real places that exist near the route. Use web_search to confirm a new place and check its hours when that matters (cafes, restaurants, shops, museums). Give your best latitude and longitude and a precise place_query (name, street, neighborhood, city) for the geocoder. Write each new stop's narration (80 to 160 words, same spoken style as the tour: what it is, a bit of history or a story, what to look for, one practical tip). Put the hours you found in note.
 - summary: 1 to 3 spoken sentences saying what changes and roughly how the timing works out.
 - If the request is ambiguous, make a sensible choice and say it in the summary.`;
 
@@ -59,7 +60,7 @@ const UPDATE_PLAN_TOOL = {
                 lat: { type: "number" }, lng: { type: "number" },
                 arrive: { type: "string", enum: ["walk", "ride"] },
                 look: { type: "string", description: "Short 'what to look for' line." },
-                note: { type: "string", description: "Short practical note, e.g. typical hours or price level." },
+                note: { type: "string", description: "Short practical note, e.g. hours or price level." },
                 text: { type: "string", description: "Spoken narration, 80 to 160 words." },
               },
               required: ["name", "place_query", "lat", "lng", "arrive", "text"],
@@ -122,6 +123,7 @@ const CREATE_TOOL = {
   },
 };
 
+const WEB_SEARCH = { type: "web_search_20250305", name: "web_search", max_uses: 3 };
 async function claude(key: string, body: Record<string, unknown>) {
   let last: any = null;
   for (const model of [MODEL, FALLBACK]) {
@@ -134,6 +136,18 @@ async function claude(key: string, body: Record<string, unknown>) {
     if (r.ok) { console.log("ok", model, j.stop_reason, JSON.stringify(j.usage || {})); return { ok: true, j, model }; }
     last = { status: r.status, type: j?.error?.type, detail: j?.error?.message || JSON.stringify(j).slice(0, 300), model };
     console.error("anthropic error", JSON.stringify(last));
+    if (r.status === 400 && /web.?search/i.test(last.detail || "") && Array.isArray(body.tools)) {
+      // web search not enabled for this org: retry once without it
+      const tools = (body.tools as any[]).filter((t) => t.name !== "web_search");
+      body = { ...body, tools: tools.length ? tools : undefined };
+      const r2 = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: { "x-api-key": key, "anthropic-version": "2023-06-01", "content-type": "application/json" },
+        body: JSON.stringify({ model, ...body }),
+      });
+      const j2 = await r2.json().catch(() => ({}));
+      if (r2.ok) { console.log("ok without web search", model); return { ok: true, j: j2, model, noSearch: true }; }
+    }
     if (r.status === 401 || r.status === 403 || /credit|billing/i.test(last.detail || "")) break;
   }
   return { ok: false, last };
@@ -212,7 +226,7 @@ async function doAsk(key: string, body: any) {
   }
   messages.push({ role: "user", content: q });
   const req: Record<string, unknown> = { max_tokens: 4000, system: ASK_SYSTEM + "\n\n" + ctx, messages };
-  if (plan) req.tools = [UPDATE_PLAN_TOOL];
+  req.tools = plan ? [WEB_SEARCH, UPDATE_PLAN_TOOL] : [WEB_SEARCH];
   const res = await claude(key, req);
   if (!res.ok) return json({ error: "llm", ...res.last }, 502);
   const j = res.j;
@@ -225,9 +239,14 @@ async function doAsk(key: string, body: any) {
     await fixCoords(news, cityHint);
     return json({ type: "plan", summary: S(inp.summary, 800), plan: items, model: res.model });
   }
-  const text = (j.content || []).filter((c: any) => c.type === "text").map((c: any) => c.text).join(" ").trim();
+  // with web search the answer arrives as several text blocks (split at citations); keep only what follows the last search
+  const blocks = j.content || [];
+  let lastTool = -1; blocks.forEach((c: any, i: number) => { if (c.type !== "text") lastTool = i; });
+  const searched = blocks.some((c: any) => c.type === "server_tool_use");
+  const text = blocks.slice(lastTool + 1).filter((c: any) => c.type === "text").map((c: any) => c.text).join("").replace(/\s+/g, " ").trim()
+    || blocks.filter((c: any) => c.type === "text").map((c: any) => c.text).join("").replace(/\s+/g, " ").trim();
   if (!text) return json({ error: "llm", detail: "empty answer, stop_reason " + j.stop_reason }, 502);
-  return json({ answer: text, model: res.model });
+  return json({ answer: text, model: res.model, searched, noSearch: !!res.noSearch });
 }
 
 async function doCreate(key: string, body: any) {

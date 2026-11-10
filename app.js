@@ -544,10 +544,10 @@ function askContext(){
     script: (current?current.stop.text:'') + '\n' + (n && n.d<1500 ? n.stop.text : ''),
     trip: T.trip||'', city:T.city||T.title, guestNotes:T.guestNotes||'', overview: tourOverview(), history: askHist.slice(-4) };
 }
-let askViaVoice=false;
+let askViaVoice=false, askSearched=false;
 async function ask(){
   const q=$('askIn').value.trim(); if(!q) return;
-  const viaVoice=askViaVoice; askViaVoice=false;
+  const viaVoice=askViaVoice; askViaVoice=false; askSearched=false;
   $('askAns').textContent = /plan|skip|add|instead|change|reorder|back (at|to|by)|time|hour|minutes|tired|hungry/i.test(q) ? 'Thinking… (plan changes take about 30 seconds)' : 'Thinking…'; $('askSay').style.display='none';
   let ans='', src='', errMsg='';
   if(navigator.onLine){
@@ -555,11 +555,11 @@ async function ask(){
       const r=await fetch(`${SB}/functions/v1/tour-ask`,{method:'POST',headers:{apikey:SBK,Authorization:'Bearer '+SBK,'Content-Type':'application/json'},body:JSON.stringify(body)});
       const j=await r.json();
       if(r.ok && j.type==='plan' && window.onPlanProposal){ askHist.push({q, a:j.summary||'I proposed a new plan.'}); askHist=askHist.slice(-6); try{ sessionStorage.setItem(SK+'askhist',JSON.stringify(askHist)); }catch(e){} window.onPlanProposal(j, viaVoice); return; }
-      if(r.ok && j.answer){ ans=j.answer; src='Claude'; } else if(j.error==='not_configured'){ src='notcfg'; } else { src='err'; errMsg=(j.detail||j.error||('HTTP '+r.status)); } }catch(e){ src='err'; errMsg=String(e); }
+      if(r.ok && j.answer){ ans=j.answer; src='Claude'; askSearched=!!j.searched; } else if(j.error==='not_configured'){ src='notcfg'; } else { src='err'; errMsg=(j.detail||j.error||('HTTP '+r.status)); } }catch(e){ src='err'; errMsg=String(e); }
   }
   if(!ans){ ans=localAnswer(q); if(ans) ans=(src==='notcfg'?'':'')+ans; }
   if(!ans) ans = navigator.onLine ? "That one isn't covered in my tour notes, and I can't reach Claude right now. Try asking staff nearby, or rephrase the question." : "I can't reach Claude without signal, and I didn't find that in the tour notes. Try again when you have signal.";
-  $('askAns').innerHTML = ans.replace(/</g,'&lt;') + `<div class="status" style="margin-top:8px">${src==='Claude'?'Answered by Claude using your location.':'From the tour notes on this phone (offline answer).'}${src==='notcfg'?' Claude answers need setup: see the owner note.':''}${src==='err'?' (Claude unavailable: '+errMsg.replace(/</g,'&lt;').slice(0,120)+')':''}</div>`;
+  $('askAns').innerHTML = ans.replace(/</g,'&lt;') + `<div class="status" style="margin-top:8px">${src==='Claude'?(askSearched?'Answered by Claude, checked on the web.':'Answered by Claude using your location.'):'From the tour notes on this phone (offline answer).'}${src==='notcfg'?' Claude answers need setup: see the owner note.':''}${src==='err'?' (Claude unavailable: '+errMsg.replace(/</g,'&lt;').slice(0,120)+')':''}</div>`;
   if(src==='Claude'){ askHist.push({q, a:ans}); askHist=askHist.slice(-6); try{ sessionStorage.setItem(SK+'askhist',JSON.stringify(askHist)); }catch(e){} }
   $('askSay').style.display=''; $('askSay').onclick=()=>sayAnswer(ans);
   sayAnswer(ans);
