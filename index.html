@@ -130,6 +130,12 @@
     <div class="row" style="margin-top:10px">
       <button class="secondary" id="testVoice">Test voice</button>
       <button class="secondary" id="resetPlayed">Reset played stops</button>
+      <button class="secondary" id="ownerBtn">🔒 Owner</button>
+    </div>
+    <div id="ownerBox" style="display:none;margin-top:10px">
+      <label>Owner PIN</label>
+      <div class="row"><input type="password" id="ownerPin" inputmode="numeric" style="flex:1;font:inherit;padding:10px;border:1px solid var(--line);border-radius:12px"><button id="ownerGo">Unlock</button></div>
+      <div class="status" id="ownerMsg"></div>
     </div>
     <div class="status">Tips: keep this page open and the screen on (the app requests it). Both phones run independently on their own GPS. Pick a voice marked "offline" if available.</div>
   </div>
@@ -166,7 +172,7 @@
   <div class="grid" id="grid"></div>
 </div></div>
 <div class="viewer" id="viewer"><img id="viewImg" alt="" crossorigin="anonymous">
-  <div class="vbar"><button id="vShare">Share</button><button id="vSave" class="secondary">Save</button><button id="vClose" class="secondary">Close</button></div>
+  <div class="vbar"><button id="vShare">Share</button><button id="vSave" class="secondary">Save</button><button id="vDel" class="warn" style="display:none">🗑 Delete</button><button id="vClose" class="secondary">Close</button></div>
   <div class="vmsg" id="vMsg"></div></div>
 <script>
 const STOPS = [
@@ -599,14 +605,35 @@ window.addEventListener('online',flush); setInterval(flush,30000);
 const nice=id=>{ const s=STOPS.find(x=>x.id===id)||FILLERS.find(x=>x.id===id); return s? s.name.replace(/\s*\(.*\)/,'') : 'On the road'; };
 async function openAlbum(){
   $('albumSheet').classList.add('open'); $('albumStatus').textContent='Loading…';
-  const local=await qAll(); let tiles=local.map(it=>({src:URL.createObjectURL(it.blob), name:it.path.split('/').pop(), pend:true}));
+  const local=await qAll(); let tiles=local.map(it=>({src:URL.createObjectURL(it.blob), name:it.path.split('/').pop(), pend:true, path:it.path}));
   try{ const r=await fetch(`${SB}/storage/v1/object/list/${BUCKET}`,{method:'POST',headers:{apikey:SBK,Authorization:'Bearer '+SBK,'Content-Type':'application/json'},body:JSON.stringify({prefix:ALBUM,limit:500,sortBy:{column:'name',order:'desc'}})});
-    const j=await r.json(); if(Array.isArray(j)){ tiles=tiles.concat(j.filter(o=>o.name&&o.name.endsWith('.jpg')).map(o=>({src:`${SB}/storage/v1/object/public/${BUCKET}/${ALBUM}/${o.name}`, name:o.name}))); }
+    const j=await r.json(); if(Array.isArray(j)){ tiles=tiles.concat(j.filter(o=>o.name&&o.name.endsWith('.jpg')).map(o=>({src:`${SB}/storage/v1/object/public/${BUCKET}/${ALBUM}/${o.name}`, name:o.name, path:`${ALBUM}/${o.name}`}))); }
     $('albumStatus').textContent = tiles.length? `${tiles.length} photo${tiles.length===1?'':'s'} from the group`:'No photos yet. Tap 📷 to add the first!';
   }catch(e){ $('albumStatus').textContent = (tiles.length?'Showing photos on this phone. ':'')+'Offline: the shared album loads when you have signal.'; }
-  $('grid').innerHTML = tiles.map(t=>{ const parts=t.name.replace('.jpg','').split('__'); const who=(parts[1]||'').replace(/-/g,' '); return `<div><img loading="lazy" crossorigin="anonymous" src="${t.src}" data-full="${t.src}">${t.pend?'<span class="pend">waiting</span>':''}<span class="tag">${who} · ${nice(parts[2])}</span></div>`; }).join('');
-  $('grid').querySelectorAll('img').forEach(i=>i.onclick=()=>{ $('viewImg').src=i.dataset.full; $('viewer').classList.add('open'); });
+  $('grid').innerHTML = tiles.map(t=>{ const parts=t.name.replace('.jpg','').split('__'); const who=(parts[1]||'').replace(/-/g,' '); return `<div><img loading="lazy" crossorigin="anonymous" src="${t.src}" data-full="${t.src}" data-path="${t.path}" data-pend="${t.pend?1:0}">${t.pend?'<span class="pend">waiting</span>':''}<span class="tag">${who} · ${nice(parts[2])}</span></div>`; }).join('');
+  $('grid').querySelectorAll('img').forEach(i=>i.onclick=()=>{ $('viewImg').src=i.dataset.full; viewPath=i.dataset.path; viewPend=i.dataset.pend==='1'; $('vDel').textContent='🗑 Delete'; delArmed=false; $('vDel').style.display=(ownerPin()||viewPend)?'':'none'; $('viewer').classList.add('open'); });
 }
+
+
+// ---------- owner moderation ----------
+let viewPath=null, viewPend=false, delArmed=false;
+const ownerPin=()=>store.get('cdj_owner_pin','');
+function ownerUI(){ $('ownerBtn').textContent = ownerPin()? '🔓 Owner (on)' : '🔒 Owner'; }
+async function adminCall(pin, path){ const r=await fetch(`${SB}/functions/v1/album-admin`,{method:'POST',headers:{apikey:SBK,Authorization:'Bearer '+SBK,'Content-Type':'application/json'},body:JSON.stringify({pin,path})}); return r; }
+$('ownerBtn').onclick=()=>{ if(ownerPin()){ store.set('cdj_owner_pin',''); ownerUI(); $('ownerBox').style.display='none'; return; } $('ownerBox').style.display=$('ownerBox').style.display==='none'?'block':'none'; };
+$('ownerGo').onclick=async()=>{ const pin=$('ownerPin').value.trim(); if(!pin) return; $('ownerMsg').textContent='Checking…';
+  try{ const r=await adminCall(pin,'__check'); if(r.ok){ store.set('cdj_owner_pin',pin); $('ownerMsg').innerHTML='<span class="ok">Owner mode on.</span> Open any album photo to delete it.'; $('ownerPin').value=''; ownerUI(); }
+    else $('ownerMsg').innerHTML='<span class="bad">Wrong PIN.</span>'; }catch(e){ $('ownerMsg').textContent='Needs signal to check the PIN.'; } };
+$('vDel').onclick=async e=>{ e.stopPropagation();
+  if(!delArmed){ delArmed=true; $('vDel').textContent='Tap again to delete'; return; }
+  $('vMsg').textContent='Deleting…';
+  try{
+    if(viewPend){ await qDel(viewPath); updateBadge(); }
+    else { const r=await adminCall(ownerPin(), viewPath); if(r.status===401){ store.set('cdj_owner_pin',''); ownerUI(); throw new Error('PIN no longer valid'); } if(!r.ok) throw new Error('server '+r.status); }
+    $('viewer').classList.remove('open'); $('vMsg').textContent=''; openAlbum();
+  }catch(err){ $('vMsg').textContent='Could not delete: '+err.message; delArmed=false; $('vDel').textContent='🗑 Delete'; }
+};
+ownerUI();
 
 // ---------- branded share ----------
 const PIN = new Path2D('M120 186 C 92 146, 64 120, 64 88 A 56 56 0 0 1 176 88 C 176 120, 148 146, 120 186 Z');
