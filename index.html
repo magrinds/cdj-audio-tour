@@ -46,6 +46,8 @@
   .stage { position:relative; overflow:hidden; border-radius:20px; box-shadow:0 10px 28px rgba(11,42,91,.22); aspect-ratio:16/9; background:#cfe0d4; margin-bottom:12px; border:1px solid var(--line); }
   .stage svg.scene { position:absolute; inset:0; width:100%; height:100%; background:none; border-radius:0; animation:kb 22s ease-in-out infinite alternate; transform-origin:var(--ox,50%) var(--oy,50%); }
   @keyframes kb { from { transform:scale(1) translate(0,0); } to { transform:scale(1.22) translate(var(--tx,-3%),var(--ty,-2%)); } }
+  .stage img.scene { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; animation:kb 22s ease-in-out infinite alternate; transform-origin:var(--ox,50%) var(--oy,50%); }
+  .stage .credit { position:absolute; top:6px; right:8px; font-size:9px; color:#fff; opacity:.8; text-shadow:0 1px 2px #000; max-width:70%; text-align:right; }
   .stage .cap { position:absolute; left:0; right:0; bottom:0; padding:22px 12px 10px; background:linear-gradient(transparent,rgba(0,0,0,.65)); color:#fff; font-weight:700; font-size:16px; }
   .stage .cap small { display:block; font-weight:500; font-size:12px; opacity:.9; }
   .quiz { background:linear-gradient(135deg,#fff7e6,#fff1d6); border:1px solid #fcd38a; border-radius:18px; padding:12px; margin-bottom:12px; display:none; }
@@ -253,8 +255,41 @@ const SCENES = {
 const SCENE_ALIAS={jaguaribe:'drive1',mantiqueira:'tb',mercado:'abernessia',teresinha:'mosteiro'};
 function showScene(id){
   const s=SCENES[id]||SCENES[SCENE_ALIAS[id]]||(String(id).startsWith('f_')?SCENES.drive1:null); const p=STOPS.find(x=>x.id===id); if(!s) return;
+  const ph = PHOTOS[id] || (SCENE_ALIAS[id] && PHOTOS[SCENE_ALIAS[id]]);
+  const cap = `<div class="cap fade">${(STOPS.find(x=>x.id===id)||FILLERS.find(x=>x.id===id)||{}).name||s.c}<small>${LOOK[id]||(String(id).startsWith('f_')?'Story time while we drive':'')}</small></div>`;
+  if(ph){
+    $('stage').innerHTML = `<img class="scene fade" src="${ph.url}" alt="" style="--ox:${s.ox};--oy:${s.oy};--tx:${s.tx};--ty:${s.ty}"><div class="credit">${ph.credit}</div>`+cap;
+    $('stage').querySelector('img').onerror=()=>{ delete PHOTOS[id]; showScene(id); };
+    return;
+  }
   $('stage').innerHTML = `<svg class="scene fade" viewBox="0 0 400 225" preserveAspectRatio="xMidYMid slice" style="--ox:${s.ox};--oy:${s.oy};--tx:${s.tx};--ty:${s.ty}">${s.svg}</svg><div class="cap fade">${(STOPS.find(x=>x.id===id)||FILLERS.find(x=>x.id===id)||{}).name||s.c}<small>${LOOK[id]||(String(id).startsWith('f_')?'Story time while we drive':'')}</small></div>`;
 }
+
+const PHOTO_Q = { drive1:"Capivari Campos do Jordão", jaguaribe:"Campos do Jordão cidade", mantiqueira:"Serra da Mantiqueira Campos do Jordão",
+ felicia:"Museu Felícia Leirner", auditorio:"Auditório Claudio Santoro", palacio:"Palácio Boa Vista Campos do Jordão",
+ tb:"Estrada de Ferro Campos do Jordão", abernessia:"Abernéssia Campos do Jordão", mercado:"Mercado Municipal Campos do Jordão",
+ teresinha:"Santa Teresinha Campos do Jordão", mosteiro:"Mosteiro São João Campos do Jordão", f_araucaria:"Araucaria angustifolia forest",
+ f_swiss:"Capivari Campos do Jordão", f_winter:"Campos do Jordão inverno", f_food:"Campos do Jordão Capivari restaurante", f_ribas:"Estrada de Ferro Campos do Jordão trem" };
+let PHOTOS = {};
+function strip(s){ const d=document.createElement('div'); d.innerHTML=s||''; return (d.textContent||'').trim(); }
+async function fetchPhotos(){
+  if(!navigator.onLine) return;
+  for(const [id,q] of Object.entries(PHOTO_Q)){
+    if(PHOTOS[id]) { new Image().src=PHOTOS[id].url; continue; }
+    try{
+      const u='https://commons.wikimedia.org/w/api.php?action=query&format=json&origin=*&generator=search&gsrnamespace=6&gsrlimit=5&prop=imageinfo&iiprop=url|extmetadata|mime&iiurlwidth=1000&gsrsearch='+encodeURIComponent(q+' filetype:bitmap');
+      const r=await fetch(u); const j=await r.json(); const pages=Object.values((j.query||{}).pages||{}).sort((a,b)=>(a.index||0)-(b.index||0));
+      const pg=pages.find(p=>p.imageinfo&&p.imageinfo[0].thumburl&&/jpe?g|png|webp/i.test(p.imageinfo[0].mime||''));
+      if(!pg) continue;
+      const ii=pg.imageinfo[0], m=ii.extmetadata||{};
+      PHOTOS[id]={url:ii.thumburl, credit:'Photo: '+(strip(m.Artist&&m.Artist.value)||'Wikimedia Commons').slice(0,40)+' · '+(strip(m.LicenseShortName&&m.LicenseShortName.value)||'')+' · Wikimedia Commons'};
+      store.set('cdj_photos',PHOTOS);
+      new Image().src=ii.thumburl;
+      if(current && current.stop.id===id) showScene(id);
+    }catch(e){}
+  }
+}
+
 let qTimer=null;
 function quizUI(mode, id, n){
   const q=QUIZ[id]; const box=$('quiz');
@@ -269,6 +304,7 @@ function quizUI(mode, id, n){
 const $ = id => document.getElementById(id);
 const store = { get(k,d){ try{ const v=localStorage.getItem(k); return v===null?d:JSON.parse(v);}catch(e){return d;} },
                 set(k,v){ try{ localStorage.setItem(k,JSON.stringify(v)); }catch(e){} } };
+PHOTOS = store.get('cdj_photos', {});
 let played = new Set(store.get('cdj_played', []));
 let queue = [];          // stop ids waiting
 let current = null;      // {stop, sentences, idx}
@@ -459,6 +495,7 @@ if('serviceWorker' in navigator){
   }).catch(()=>{});
 }
 showScene('drive1'); renderStops(); drawMap();
+fetchPhotos().then(()=>{ if(!current) showScene('drive1'); });
 </script>
 </body>
 </html>
