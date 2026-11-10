@@ -949,14 +949,14 @@ function askContext(){
 async function ask(){
   const q=$('askIn').value.trim(); if(!q) return;
   $('askAns').textContent='Thinking…'; $('askSay').style.display='none';
-  let ans='', src='';
+  let ans='', src='', errMsg='';
   if(navigator.onLine){
     try{ const r=await fetch(`${SB}/functions/v1/tour-ask`,{method:'POST',headers:{apikey:SBK,Authorization:'Bearer '+SBK,'Content-Type':'application/json'},body:JSON.stringify(Object.assign({question:q},askContext()))});
-      const j=await r.json(); if(r.ok && j.answer){ ans=j.answer; src='Claude'; } else if(j.error==='not_configured'){ src='notcfg'; } }catch(e){}
+      const j=await r.json(); if(r.ok && j.answer){ ans=j.answer; src='Claude'; } else if(j.error==='not_configured'){ src='notcfg'; } else { src='err'; errMsg=(j.detail||j.error||('HTTP '+r.status)); } }catch(e){ src='err'; errMsg=String(e); }
   }
   if(!ans){ ans=localAnswer(q); if(ans) ans=(src==='notcfg'?'':'')+ans; }
   if(!ans) ans = navigator.onLine ? "I'm not sure about that one. Try asking a staff member nearby, or rephrase the question." : "I can't reach Claude without signal, and I didn't find that in the tour notes. Try again when you have signal.";
-  $('askAns').innerHTML = ans.replace(/</g,'&lt;') + `<div class="status" style="margin-top:8px">${src==='Claude'?'Answered by Claude using your location.':'From the tour notes on this phone (offline answer).'}${src==='notcfg'?' Claude answers need setup: see the owner note.':''}</div>`;
+  $('askAns').innerHTML = ans.replace(/</g,'&lt;') + `<div class="status" style="margin-top:8px">${src==='Claude'?'Answered by Claude using your location.':'From the tour notes on this phone (offline answer).'}${src==='notcfg'?' Claude answers need setup: see the owner note.':''}${src==='err'?' (Claude unavailable: '+errMsg.replace(/</g,'&lt;').slice(0,120)+')':''}</div>`;
   $('askSay').style.display=''; $('askSay').onclick=()=>sayAnswer(ans);
   sayAnswer(ans);
 }
