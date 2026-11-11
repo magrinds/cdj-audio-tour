@@ -393,7 +393,10 @@ async function syncSchedule(){
   const mine=store.get(SK+'sched',null);
   if(store.get(SK+'schedPending',false) && mine){ await shareSchedule(mine); return; }
   try{ const r=await fetch(`${SB}/rest/v1/rhrn_schedules?tour_id=eq.${encodeURIComponent(T.id)}&select=v,sched,updated_by`, {headers:{apikey:SBK, Authorization:'Bearer '+SBK}, cache:'no-store'});
-    const rows=await r.json(); if(!Array.isArray(rows)||!rows.length) return;
+    const rows=await r.json(); if(!Array.isArray(rows)) return;
+    // a schedule built on this phone that the server doesn't have yet (e.g. built before sharing existed): upload it
+    if(mine && (!rows.length || ((mine.v||0) > rows[0].v))){ if(!mine.v){ mine.v=Date.now(); store.set(SK+'sched', mine); } await shareSchedule(mine); return; }
+    if(!rows.length) return;
     const row=rows[0]; if(row.v > ((mine&&mine.v)||0) && row.sched){ row.sched.v=row.v; store.set(SK+'sched', row.sched); renderSchedule(row.sched);
       $('schedMeta').textContent = 'shared'+(row.updated_by?' by '+row.updated_by:'')+(row.sched.madeAt?' · '+row.sched.madeAt:'');
       if(mine) toast('🕒 Schedule updated'+(row.updated_by?' by '+row.updated_by:'')); }
