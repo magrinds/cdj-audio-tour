@@ -203,7 +203,7 @@ $('hoh').checked = store.get('cdj_hoh',false); document.body.classList.toggle('h
 $('hoh').onchange = ()=>{ document.body.classList.toggle('hoh',$('hoh').checked); store.set('cdj_hoh',$('hoh').checked); if($('hoh').checked) hush(); if(current){ current.token=Math.random(); speakNext(); } };
 $('voice').onchange = ()=>store.set('cdj_voice',$('voice').value);
 $('rate').oninput = ()=>{ $('rateVal').textContent=(+$('rate').value).toFixed(2); store.set('cdj_rate',$('rate').value); };
-$('premium').checked = store.get('rhrn_premium', true); $('premium').onchange=()=>{ store.set('rhrn_premium',$('premium').checked); if(!$('premium').checked) try{ AUD.pause(); }catch(e){} };
+$('premium').checked = store.get('rhrn_premium', true); $('premium').onchange=()=>{ store.set('rhrn_premium',$('premium').checked); slowUntil=0; premiumNote(''); if(!$('premium').checked) try{ AUD.pause(); }catch(e){} };
 $('rate').value = store.get('cdj_rate','1'); $('rateVal').textContent=(+$('rate').value).toFixed(2);
 
 // ---------- premium voice (ElevenLabs via the tour-tts function), phone voice as fallback ----------
@@ -215,7 +215,7 @@ const ttsPending = {};
 function premiumOn(){ return $('premium') && $('premium').checked && !ttsOff && !document.body.classList.contains('hoh'); }
 // bandwidth guard: slow connection or a clip that misses its deadline -> phone voice for a few minutes
 let slowUntil = 0;
-function netSlow(){ const c=navigator.connection; if(c && (c.saveData || /(^|-)2g|3g/.test(c.effectiveType||''))) return true; return Date.now()<slowUntil; }
+function netSlow(){ const c=navigator.connection; if(c && (c.saveData || /2g/.test(c.effectiveType||''))) return true; return Date.now()<slowUntil; }
 function markSlow(){ slowUntil=Date.now()+3*60*1000; premiumNote('Weak signal: using the phone voice for now.'); setTimeout(()=>{ if(!netSlow()) premiumNote(''); }, 3*60*1000+500); }
 function ttsKey(text){ let h=0; for(let i=0;i<text.length;i++){ h=((h<<5)-h+text.charCodeAt(i))|0; } return (h>>>0).toString(36)+'_'+text.length; }
 function saveTtsUrls(){ try{ const k=Object.keys(ttsUrls); if(k.length>3000) k.slice(0,k.length-3000).forEach(x=>delete ttsUrls[x]); localStorage.setItem(TTS_KEY, JSON.stringify(ttsUrls)); }catch(e){} }
