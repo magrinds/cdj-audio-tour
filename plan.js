@@ -269,3 +269,52 @@ async function syncPlan(){
   }catch(e){}
 }
 setInterval(syncPlan, 45000); window.addEventListener('online', syncPlan); setTimeout(syncPlan, 4000);
+
+
+// ---------- schedule ----------
+async function runJob(body, maxMs){
+  let id=null; for(let a=0;a<3 && !id;a++){ try{ const r=await fn(body, 30000); if(r.ok && r.j.job) id=r.j.job; else if(!r.ok) throw new Error(r.j.detail||r.j.error||'server error'); }catch(e){ if(a===2) throw e; await new Promise(ok=>setTimeout(ok,3000)); } }
+  if(!id) throw new Error('could not reach the server');
+  const until=Date.now()+(maxMs||240000);
+  while(Date.now()<until){ await new Promise(ok=>setTimeout(ok,3000));
+    try{ const r=await fetch(`${SB}/rest/v1/rhrn_jobs?id=eq.${id}&select=status,result,error`,{headers:{apikey:SBK,Authorization:'Bearer '+SBK},cache:'no-store'}); const rows=await r.json();
+      if(rows && rows[0]){ if(rows[0].status==='done') return rows[0].result; if(rows[0].status==='error') throw new Error(rows[0].error||'failed'); } }
+    catch(e){ if(e && e.message && !/fetch|network/i.test(e.message)) throw e; } }
+  throw new Error('took too long; try again');
+}
+(function initSchedule(){
+  const p=n=>String(n).padStart(2,'0'); const now=new Date(); const today=`${now.getFullYear()}-${p(now.getMonth()+1)}-${p(now.getDate())}`;
+  const req=T.request||{}; const started=STOPS.some(s=>played.has(s.id));
+  $('sDate').value = req.date && req.date>=today ? req.date : today;
+  $('sRemaining').checked = started;
+  const setDefaultTime=()=>{ if($('sAnchor').value==='end') $('sTime').value = req.end || '17:00';
+    else $('sTime').value = $('sRemaining').checked ? `${p(now.getHours())}:${p(Math.ceil(now.getMinutes()/5)*5%60)}` : (req.time || '10:00'); };
+  setDefaultTime(); $('sAnchor').onchange=setDefaultTime; $('sRemaining').onchange=setDefaultTime;
+  const saved=store.get(SK+'sched',null); if(saved) renderSchedule(saved);
+  $('sGo').onclick=async ()=>{
+    if(!navigator.onLine){ $('schedOut').innerHTML='<div class="status bad">Building a schedule needs signal. Your last schedule stays here offline.</div>'; return; }
+    let list=STOPS.filter(s=>isFinite(s.lat));
+    if($('sRemaining').checked){ list=list.filter(s=>!played.has(s.id)); if(lastFix) list=[{id:'here', name:'Where you are now', lat:lastFix.lat, lng:lastFix.lng}].concat(list); }
+    if(list.length<2){ $('schedOut').innerHTML='<div class="status">Not enough stops left to schedule.</div>'; return; }
+    $('sGo').disabled=true; const t0=Date.now(); const tick=setInterval(()=>{ $('sGo').textContent=`Checking routes and traffic… ${Math.round((Date.now()-t0)/1000)}s`; },1000);
+    try{
+      const res=await runJob({mode:'schedule_job', stops:list.map(s=>({id:s.id, name:s.name.replace(/\s*\(passing\)/,''), lat:s.lat, lng:s.lng, pass:/\(passing\)|drive-by/i.test(s.name), note:s.note||''})),
+        anchor:$('sAnchor').value, time:$('sTime').value, date:$('sDate').value, city:T.city||T.title, transport:(T.request&&T.request.transport)||({walk:'Walking',walk_ride:'Walking + Uber',car:'Car'}[T.mode]||'Walking + Uber'), group:T.guestNotes||''});
+      res.madeAt=new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}); store.set(SK+'sched', res); renderSchedule(res);
+      if(res.summary) speak(res.summary);
+    }catch(e){ $('schedOut').innerHTML='<div class="status bad">Could not build the schedule: '+esc(e.message||e)+'</div>'; }
+    finally{ clearInterval(tick); $('sGo').disabled=false; $('sGo').textContent='Build schedule'; }
+  };
+})();
+function renderSchedule(r){
+  const icon=l=>l.mode==='walk'?'🚶':'🚗';
+  const legTxt=l=>l.mode==='walk' ? `Walk about ${l.min} min (${l.km.toFixed(1)} km)` : `Ride about ${l.min} min (${l.km.toFixed(1)} km): ~${l.wait} min to get a car, traffic ×${(+l.factor).toFixed(1)}`;
+  $('schedMeta').textContent = r.madeAt ? 'made '+r.madeAt : '';
+  $('schedOut').innerHTML = `<div class="sched">
+    <div class="status" style="margin:0 0 4px"><b>${esc(r.start)} → ${esc(r.finish)}</b> · ${Math.floor(r.total/60)} h ${r.total%60} min, plus ${r.cushion} min spare (done by ${esc(r.finishWithCushion)})</div>
+    ${r.summary?`<div style="margin:4px 0 6px">${esc(r.summary)}</div>`:''}
+    ${(r.warnings||[]).map(w=>`<div class="warn">⚠️ ${esc(w)}</div>`).join('')}
+    ${r.rows.map(x=>`<div class="r"><div class="t">${esc(x.arrive)}</div><div class="n">${esc(x.name)}${x.pass?' <small style="display:inline">(passing)</small>':''}<small>${x.visit?`Stay ~${x.visit} min, leave ${esc(x.depart)}`:''}${x.note?(x.visit?' · ':'')+esc(x.note):''}</small></div></div>${x.leg?`<div class="leg">${icon(x.leg)} ${esc(legTxt(x.leg))}${x.leg.note?' · '+esc(x.leg.note):''}</div>`:''}`).join('')}
+    <div class="status" style="margin-top:8px">Buffers included: walking +25%, rides +20% plus pickup wait, stops +10%, and ${r.cushion} min spare at the end.${r.routed?'':' Some legs used straight-line estimates.'}</div>
+  </div>`;
+}

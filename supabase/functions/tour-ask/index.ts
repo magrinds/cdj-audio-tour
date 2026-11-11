@@ -5,6 +5,7 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 //   modes "create_outline_job" / "create_narrate" / "create_geocode" / "create_assemble": build a new tour in steps, save to rhrn_tours
 //   mode "save_plan": store the group's current plan in rhrn_tour_plans
 //   mode "delete_tour": delete a shared tour (owner PIN)
+//   mode "schedule_job": timed schedule with routing, traffic and buffers
 
 const cors = {
   "Access-Control-Allow-Origin": "*",
@@ -385,6 +386,109 @@ async function doAssemble(body: any) {
   return json({ tour, saved: ins.ok });
 }
 
+
+// ---------- schedule: real road/foot routing + Claude's traffic, wait and visit estimates, generous buffers ----------
+const SCHED_SYSTEM = `You are the timing planner for a self-guided tour in the "Right Here, Right Now" app. You get the ordered stops, the routed distance and free-flow time of each leg (by car and on foot), the date and the anchor time.
+Your job: realistic, generous estimates. Return them by calling schedule_estimates.
+- For each leg choose walk or ride. With walking plus Uber, walk legs under about 1.2 km unless steep or unsafe; ride the rest. With car, ride everything except very short hops. With walking only, walk.
+- traffic_factor: multiply free-flow car time for the expected traffic on that day and hour (1.0 none, 1.3 moderate, 2.0 heavy, up to 3.0). Consider weekday vs weekend, rush hours, school runs, holidays, festival season and tourist peaks for this place. Use web_search to check events, holidays, road works or typical congestion when it matters. For walk legs use 1.0.
+- wait_min: minutes to get a ride (Uber/taxi pickup), typically 5 to 15 in towns, more in remote spots or peak times; 0 for walk legs or own car (add parking time instead).
+- visit_min for each stop: realistic time there (pass-by points 0, quick photo stops 10 to 15, cafes and lunch 45 to 75, parks and viewpoints 30 to 60, museums 60 to 90). Starting point: 0.
+- note per stop: opening hours or closing time for that date if known (check with web_search for anything that may be closed), and booking or ticket tips.
+- warnings: anything that could break the plan (closed that day, last entry, heavy traffic window, weather) in short plain sentences.
+- summary: one or two spoken sentences on the overall timing.
+Plain text, no em dashes.`;
+
+const SCHED_TOOL = {
+  name: "schedule_estimates",
+  description: "Return timing estimates for each leg and stop.",
+  input_schema: {
+    type: "object",
+    properties: {
+      legs: { type: "array", description: "One per leg, leg i goes from stop i to stop i+1.", items: { type: "object", properties: {
+        mode: { type: "string", enum: ["walk", "ride"] }, traffic_factor: { type: "number" }, wait_min: { type: "number" }, note: { type: "string" } }, required: ["mode", "traffic_factor", "wait_min"] } },
+      stops: { type: "array", description: "One per stop, same order.", items: { type: "object", properties: {
+        visit_min: { type: "number" }, note: { type: "string" } }, required: ["visit_min"] } },
+      warnings: { type: "array", items: { type: "string" } },
+      summary: { type: "string" },
+    },
+    required: ["legs", "stops", "warnings", "summary"],
+  },
+};
+
+async function osrm(profile: string, pts: { lat: number; lng: number }[]) {
+  const coords = pts.map((p) => `${p.lng.toFixed(6)},${p.lat.toFixed(6)}`).join(";");
+  const base = profile === "foot" ? "https://routing.openstreetmap.de/routed-foot/route/v1/foot/" : "https://router.project-osrm.org/route/v1/driving/";
+  try {
+    const r = await fetch(`${base}${coords}?overview=false`, { headers: { "User-Agent": UA } });
+    if (!r.ok) return null;
+    const j = await r.json();
+    const legs = j?.routes?.[0]?.legs;
+    return Array.isArray(legs) ? legs.map((l: any) => ({ km: l.distance / 1000, min: l.duration / 60 })) : null;
+  } catch { return null; }
+}
+const hm = (m: number) => { m = ((Math.round(m) % 1440) + 1440) % 1440; return `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`; };
+const toMin = (t: string) => { const m = /^(\d{1,2}):(\d{2})/.exec(t || ""); return m ? +m[1] * 60 + +m[2] : NaN; };
+
+async function doSchedule(key: string, body: any) {
+  const stops = (Array.isArray(body.stops) ? body.stops : []).slice(0, 30)
+    .map((s: any) => ({ id: S(s.id, 40), name: S(s.name, 100), lat: +s.lat, lng: +s.lng, pass: !!s.pass, note: S(s.note, 140) }))
+    .filter((s: any) => Number.isFinite(s.lat) && Number.isFinite(s.lng));
+  if (stops.length < 2) return json({ error: "schedule", detail: "need at least two places" }, 400);
+  const anchor = body.anchor === "end" ? "end" : "start";
+  const at = toMin(S(body.time, 8));
+  if (!Number.isFinite(at)) return json({ error: "schedule", detail: "pick a time" }, 400);
+  const [car, foot] = await Promise.all([osrm("car", stops), osrm("foot", stops)]);
+  const legsIn = stops.slice(1).map((s: any, i: number) => {
+    const a = stops[i], d = dist(a.lat, a.lng, s.lat, s.lng) / 1000;
+    const c = car?.[i] || { km: d * 1.4, min: (d * 1.4) / 30 * 60 };
+    const f = foot?.[i] || { km: d * 1.3, min: (d * 1.3) / 4.2 * 60 };
+    return { car_km: +c.km.toFixed(2), car_min: Math.round(c.min), walk_km: +f.km.toFixed(2), walk_min: Math.round(f.min), routed: !!(car && foot) };
+  });
+  const list = stops.map((s: any, i: number) => `${i + 1}. ${s.name}${s.pass ? " [pass-by]" : ""}${s.note ? " (" + s.note + ")" : ""}` +
+    (i < legsIn.length ? `\n   leg to next: car ${legsIn[i].car_km} km / ${legsIn[i].car_min} min free-flow, walk ${legsIn[i].walk_km} km / ${legsIn[i].walk_min} min` : "")).join("\n");
+  const prompt = `Place: ${S(body.city, 160)}\nDate: ${S(body.date, 12)}${dayName(body.date)}\n${anchor === "start" ? "Leaving at" : "Must finish by"}: ${hm(at)} local time\nGetting around: ${S(body.transport, 30) || "walking plus Uber"}\nGroup: ${S(body.group, 200) || "not given"}\nStops in order:\n${list}`;
+  const res = await claude(key, { max_tokens: 10000, system: SCHED_SYSTEM, messages: [{ role: "user", content: prompt }], tools: [{ ...WEB_SEARCH, max_uses: 3 }, SCHED_TOOL] });
+  let est: any = null;
+  if (res.ok) est = ((res.j.content || []).find((c: any) => c.type === "tool_use" && c.name === "schedule_estimates") || {}).input || null;
+  if (!est) {
+    const r2 = await claude(key, { max_tokens: 8000, system: SCHED_SYSTEM, messages: [{ role: "user", content: prompt + "\nDo not search; call schedule_estimates now." }], tools: [SCHED_TOOL] });
+    if (r2.ok) est = ((r2.j.content || []).find((c: any) => c.type === "tool_use") || {}).input || null;
+  }
+  est = est || { legs: [], stops: [], warnings: ["Could not get traffic estimates; used default timings."], summary: "" };
+  const walkOnly = /^walk/i.test(S(body.transport, 30)) && !/uber|\+/i.test(S(body.transport, 30));
+  const carOnly = /car/i.test(S(body.transport, 30));
+  // durations with generous buffers
+  const legs = legsIn.map((l: any, i: number) => {
+    const e = (est.legs || [])[i] || {};
+    let mode = e.mode === "walk" || e.mode === "ride" ? e.mode : (l.walk_km < 1.2 ? "walk" : "ride");
+    if (walkOnly) mode = "walk";
+    if (mode === "walk") return { mode, km: l.walk_km, min: Math.ceil(l.walk_min * 1.25 + 3), base: l.walk_min, note: S(e.note, 140) };
+    const factor = Math.min(3, Math.max(1, +e.traffic_factor || 1.2));
+    const wait = carOnly ? Math.max(5, +e.wait_min || 5) : Math.max(8, +e.wait_min || 10);
+    return { mode, km: l.car_km, min: Math.ceil(l.car_min * factor * 1.2 + wait + 3), base: l.car_min, factor, wait, note: S(e.note, 140) };
+  });
+  const visits = stops.map((s: any, i: number) => {
+    const v = +((est.stops || [])[i] || {}).visit_min;
+    if (i === 0 || s.pass) return 0;
+    return Math.ceil(Math.max(10, Number.isFinite(v) ? v : 30) * 1.1);
+  });
+  const total = legs.reduce((a: number, l: any) => a + l.min, 0) + visits.reduce((a: number, v: number) => a + v, 0);
+  const cushion = 15; // spare minutes kept at the end
+  let t = anchor === "start" ? at : at - cushion - total;
+  const rows = stops.map((s: any, i: number) => {
+    const arrive = t; const depart = t + visits[i];
+    t = depart + (legs[i] ? legs[i].min : 0);
+    return { id: s.id, name: s.name, pass: s.pass, arrive: hm(arrive), depart: hm(depart), visit: visits[i], note: S(((est.stops || [])[i] || {}).note, 160), leg: legs[i] || null };
+  });
+  const startAt = anchor === "start" ? at : at - cushion - total;
+  return json({
+    anchor, date: S(body.date, 12), start: hm(startAt), finish: hm(startAt + total), finishWithCushion: hm(startAt + total + cushion),
+    total, cushion, rows, warnings: (est.warnings || []).slice(0, 8).map((w: unknown) => S(w, 200)), summary: S(est.summary, 400),
+    routed: legsIn.every((l: any) => l.routed), model: res.ok ? res.model : null,
+  });
+}
+
 // Long steps run in the background so a dropped phone connection can't break them:
 // the app gets a job id right away and polls rhrn_jobs for the result.
 declare const EdgeRuntime: { waitUntil(p: Promise<unknown>): void };
@@ -439,6 +543,7 @@ Deno.serve(async (req: Request) => {
     const key = (Deno.env.get("ANTHROPIC_API_KEY_RHRN") || "").trim();
     if (!key) return json({ error: "not_configured" }, 503);
     if (body.mode === "create_outline_job") return startJob(() => doOutline(key, body));
+    if (body.mode === "schedule_job") return startJob(() => doSchedule(key, body));
     if (body.mode === "create_outline") return await doOutline(key, body);
     if (body.mode === "create_narrate") return await doNarrate(key, body);
     if (body.mode === "create_geocode") return await doGeocode(body);

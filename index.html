@@ -121,6 +121,13 @@
   .tourbar { display:flex; align-items:center; gap:10px; }
   .tourbar .t { flex:1; min-width:0; } .tourbar .t b { font-size:17px; color:var(--deep); } .tourbar .t div { font-size:12px; color:var(--mute); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   .pill { display:inline-block; font-size:11px; font-weight:700; background:#fff7e6; color:#b45309; border:1px solid #fcd38a; border-radius:999px; padding:1px 8px; margin-left:6px; vertical-align:middle; }
+  .card .inp { width:100%; font:inherit; padding:10px; border:1px solid var(--line); border-radius:12px; margin:4px 0 8px; background:#fff; }
+  .sched { margin-top:10px; }
+  .sched .r { display:flex; gap:10px; padding:8px 0; border-top:1px solid var(--line); }
+  .sched .t { width:56px; font-weight:800; color:var(--deep); font-variant-numeric:tabular-nums; }
+  .sched .n { flex:1; } .sched .n small { display:block; color:var(--mute); font-size:12px; }
+  .sched .leg { margin-left:66px; font-size:12px; color:var(--mute); padding:2px 0 6px; }
+  .sched .warn { background:#fff7e6; border:1px solid #fcd38a; color:#8a4b00; border-radius:10px; padding:8px 10px; font-size:13px; margin-top:8px; }
   .chips button.planchip { background:#fff7e6; color:#b45309; border:1px solid #fcd38a; }
   .sheet textarea, .sheet .inp { width:100%; font:inherit; padding:12px; border:1px solid var(--line); border-radius:12px; margin:6px 0 10px; }
   .hidep { display:flex; align-items:center; gap:6px; font-size:13px; color:var(--mute); margin:4px 0; } .hidep input { width:18px; height:18px; }
@@ -188,6 +195,17 @@
       <div class="status" id="gNote"><span id="gNoteTxt"></span> <a id="gOpen" target="_blank" rel="noopener">Open in Google Maps ↗</a></div></div>
     <svg id="map" viewBox="0 0 400 260" style="display:none"></svg>
     <div class="status" id="gpsInfo">GPS: off</div>
+  </div>
+
+  <div class="card" id="schedCard">
+    <div class="row" style="justify-content:space-between;align-items:center"><b style="font-size:17px;color:var(--deep)">🕒 Schedule</b><span class="status" id="schedMeta" style="margin:0"></span></div>
+    <div class="row" style="gap:8px;align-items:flex-end;margin-top:6px">
+      <div style="flex:1.3"><label>Date</label><input class="inp" type="date" id="sDate"></div>
+      <div style="flex:1"><select id="sAnchor" class="inp" style="padding:6px;margin:0 0 4px"><option value="start">Start at</option><option value="end">Finish by</option></select><input class="inp" type="time" id="sTime"></div>
+    </div>
+    <label style="display:flex;gap:8px;align-items:center;margin:4px 0 8px"><input type="checkbox" id="sRemaining"> Only stops not heard yet, from where I am now</label>
+    <button id="sGo" style="width:100%">Build schedule</button>
+    <div id="schedOut"></div>
   </div>
 
   <div class="card">
