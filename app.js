@@ -184,6 +184,10 @@ let ttsUrls = {}; try{ ttsUrls = JSON.parse(localStorage.getItem(TTS_KEY)||'{}')
 let ttsOff = false;                       // set when the server says premium voice isn't configured
 const ttsPending = {};
 function premiumOn(){ return $('premium') && $('premium').checked && !ttsOff && !document.body.classList.contains('hoh'); }
+// bandwidth guard: slow connection or a clip that misses its deadline -> phone voice for a few minutes
+let slowUntil = 0;
+function netSlow(){ const c=navigator.connection; if(c && (c.saveData || /(^|-)2g|3g/.test(c.effectiveType||''))) return true; return Date.now()<slowUntil; }
+function markSlow(){ slowUntil=Date.now()+3*60*1000; premiumNote('Weak signal: using the phone voice for now.'); setTimeout(()=>{ if(!netSlow()) premiumNote(''); }, 3*60*1000+500); }
 function ttsKey(text){ let h=0; for(let i=0;i<text.length;i++){ h=((h<<5)-h+text.charCodeAt(i))|0; } return (h>>>0).toString(36)+'_'+text.length; }
 function saveTtsUrls(){ try{ const k=Object.keys(ttsUrls); if(k.length>3000) k.slice(0,k.length-3000).forEach(x=>delete ttsUrls[x]); localStorage.setItem(TTS_KEY, JSON.stringify(ttsUrls)); }catch(e){} }
 function ttsUrl(text, prev, next){
@@ -199,11 +203,18 @@ function ttsUrl(text, prev, next){
 }
 function premiumNote(t){ const n=$('premiumNote'); if(n) n.textContent=t; }
 const seqText = it => typeof it==='object' ? (it.t||'') : it;
-function prefetchSeq(seq, from){ if(!premiumOn() || !navigator.onLine) return;
+// warm the first lines of upcoming stops so each one starts instantly
+let warmBusy=false;
+function warmUpcoming(){ if(warmBusy || !premiumOn() || !navigator.onLine || netSlow()) return;
+  const ids=[]; for(const st of STOPS){ if(!played.has(st.id) && !(current&&current.stop.id===st.id)) ids.push(st.id); if(ids.length>=8) break; }
+  const lines=[]; ids.forEach(id=>{ const st=findAny(id); if(!st||!st.text) return; const seq=buildSeq(id, st).map(seqText); for(let j=0;j<Math.min(2,seq.length);j++) if(seq[j]) lines.push([seq[j], seq[j-1], seq[j+1]]); });
+  if(!lines.length) return; warmBusy=true;
+  (async()=>{ for(const [t,a,b] of lines){ if(!premiumOn()||netSlow()) break; await ttsUrl(t,a,b); } warmBusy=false; })(); }
+function prefetchSeq(seq, from){ if(!premiumOn() || !navigator.onLine || netSlow()) return;
   const items=seq.map(seqText); let i=from||0;
   const run=async()=>{ while(i<items.length){ const j=i++; if(items[j]) await ttsUrl(items[j], items[j-1], items[j+1]); } };
   run(); }
-function hush(){ if(synth) synth.cancel(); try{ AUD.pause(); }catch(e){} AUD.onended=AUD.onerror=null; }
+function hush(){ if(synth) synth.cancel(); try{ AUD.pause(); }catch(e){} AUD.onended=AUD.onerror=AUD.onplaying=null; }
 function speakNext(){
   if(!current || paused) return;
   if(current.idx >= current.sentences.length){ finishCurrent(); return; }
@@ -232,17 +243,20 @@ function speakNext(){
   if(premiumOn()){
     const seq=current.sentences, i=current.idx;
     let fellBack=false;
-    const phone=()=>{ if(fellBack||!current||current.token!==myToken||paused) return; fellBack=true; synth.cancel(); synth.speak(u); };
-    const timer=setTimeout(phone, 6000); // slow network: don't leave silence, fall back for this sentence
+    const k=ttsKey(text), known=!!ttsUrls[k];
+    if(!known && (netSlow() || !navigator.onLine)){ synth.speak(u); return; } // no bandwidth: phone voice, no waiting
+    const phone=()=>{ if(fellBack||!current||current.token!==myToken||paused) return; fellBack=true; try{ AUD.pause(); }catch(e){} AUD.onended=AUD.onerror=AUD.onplaying=null; synth.cancel(); synth.speak(u); };
+    // a clip that isn't playing within 2.5s means weak signal: phone voice takes this line and the next few minutes
+    const timer=setTimeout(()=>{ if(!fellBack && current && current.token===myToken && !paused){ markSlow(); phone(); } }, known?3500:2500);
     ttsUrl(text, seqText(seq[i-1]||''), seqText(seq[i+1]||'')).then(url=>{
-      clearTimeout(timer);
       if(!current||current.token!==myToken||paused) return;
       if(!url){ phone(); return; }
       if(fellBack) return; // the phone voice already took this sentence
       AUD.onended=()=>{ if(!current||current.token!==myToken||paused) return; current.idx++; speakNext(); };
-      AUD.onerror=()=>{ AUD.onended=AUD.onerror=null; phone(); };
+      AUD.onerror=()=>{ clearTimeout(timer); AUD.onended=AUD.onerror=null; phone(); };
+      AUD.onplaying=()=>{ clearTimeout(timer); AUD.onplaying=null; };
       AUD.src=url; AUD.playbackRate=+$('rate').value; current.audioIdx=i;
-      AUD.play().catch(()=>{ AUD.onended=AUD.onerror=null; phone(); });
+      AUD.play().catch(()=>{ clearTimeout(timer); AUD.onended=AUD.onerror=null; phone(); });
     });
     return;
   }
@@ -261,7 +275,7 @@ function startStop(id){
   hush();
   paused=false;
   current = { stop, sentences: buildSeq(id, stop), idx:0, token:Math.random(), audioIdx:-1 };
-  prefetchSeq(current.sentences, 0);
+  prefetchSeq(current.sentences, 0); setTimeout(warmUpcoming, 20000);
   showScene(id); quizUI('hide'); showLook(id);
   played.add(id); store.set(SK+'played',[...played]);
   $('nowTitle').textContent = '🔊 '+stop.name; $('pauseBtn').textContent='Pause';
@@ -584,7 +598,7 @@ function sayText(text, onend){
   if(document.body.classList.contains('hoh') || !synth){ onend && setTimeout(onend,300); return; }
   hush();
   const phone=()=>{ synth.cancel(); const u=new SpeechSynthesisUtterance(text); const v=voices.find(v=>v.name===$('voice').value); if(v){u.voice=v;u.lang=v.lang;} u.rate=+$('rate').value; if(onend){ u.onend=onend; u.onerror=onend; } synth.speak(u); };
-  if(!premiumOn() || text.length>2400){ phone(); return; }
+  if(!premiumOn() || netSlow() || text.length>2400){ phone(); return; }
   const my=Math.random(); sayText.tok=my;
   ttsUrl(text).then(url=>{ if(sayText.tok!==my) return; if(!url){ phone(); return; }
     AUD.onended=()=>{ AUD.onended=null; onend&&onend(); }; AUD.onerror=()=>{ AUD.onerror=null; phone(); };
@@ -744,3 +758,6 @@ showScene(START_ID); renderStops(); drawMap(); try{ renderWalk(); }catch(e){}
 })();
 
 fetchPhotos().then(()=>{ if(!current) showScene(START_ID); });
+// warm upcoming stops shortly after load and whenever we come back online
+setTimeout(()=>{ try{ warmUpcoming(); }catch(e){} }, 4000);
+window.addEventListener('online', ()=>setTimeout(()=>{ try{ warmUpcoming(); }catch(e){} }, 2000));
