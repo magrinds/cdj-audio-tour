@@ -205,6 +205,9 @@ function buildProposal(j){
   return {stops:out, items, removed, summary:j.summary||'Here is the new plan.'};
 }
 window.onPlanProposal = function(j, viaVoice){
+  // older proposals in the chat thread: retire their buttons so ids stay unique
+  document.querySelectorAll('#askThread #planYes, #askThread #planNo').forEach(b=>{ const row=b.closest('.row'); if(row) row.outerHTML='<div class="status">Replaced by a newer proposal.</div>'; });
+  document.querySelectorAll('#askThread #planMsg').forEach(m=>m.removeAttribute('id'));
   proposal = buildProposal(j);
   if(!proposal.items.length && !proposal.removed.length){ $('askAns').textContent = j.summary || 'No change needed.'; speak(j.summary); return; }
   const li = (icon, s, extra)=>`<div class="stop"><div class="num" style="font-size:15px">${icon}</div><div class="info"><div class="name">${esc(s.name)}</div><div class="meta">${extra}</div></div></div>`;
