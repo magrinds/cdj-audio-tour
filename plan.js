@@ -131,9 +131,16 @@ $('cGo').onclick = async ()=>{
     interests:[...pickState.likes], group:$('cGroup').value.trim(), more:$('cMore').value.trim(), lat:lastFix?lastFix.lat:null, lng:lastFix?lastFix.lng:null,
     local:new Date().toString().slice(0,24)};
   try{
-    const o = await fn(Object.assign({mode:'create_outline'}, form), 150000);
-    if(!o.ok || !o.j.outline) throw new Error(o.j.detail||o.j.error||'could not plan the route');
-    const {outline, ctx, jobs} = o.j;
+    // start the route planning in the background, then poll for it (survives signal drops)
+    let start=null; for(let a=0;a<3 && !start;a++){ try{ const r=await fn(Object.assign({mode:'create_outline_job'}, form), 30000); if(r.ok && r.j.job) start=r.j.job; }catch(e){ await new Promise(ok=>setTimeout(ok,3000)); } }
+    if(!start) throw new Error('could not reach the server; check signal and try again');
+    let res=null; const until=Date.now()+300000;
+    while(!res && Date.now()<until){ await new Promise(ok=>setTimeout(ok,4000));
+      try{ const r=await fetch(`${SB}/rest/v1/rhrn_jobs?id=eq.${start}&select=status,result,error`,{headers:{apikey:SBK,Authorization:'Bearer '+SBK},cache:'no-store'}); const rows=await r.json();
+        if(rows && rows[0]){ if(rows[0].status==='done') res=rows[0].result; else if(rows[0].status==='error') throw new Error(rows[0].error||'could not plan the route'); } }
+      catch(e){ if(e && e.message && !/fetch|network/i.test(e.message)) throw e; } }
+    if(!res || !res.outline) throw new Error('route planning took too long; try again');
+    const {outline, ctx, jobs} = res;
     step=1; stage=`Writing the stories for ${outline.stops.length} places and ${outline.story_topics.length} travel stories (0/${jobs.length})`;
     const geoP = fn({mode:'create_geocode', items:outline.stops, city:outline.city}, 120000).then(r=>r.ok?r.j.items:[]).catch(()=>[]);
     const texts={}; let done=0; const batches=[]; for(let i=0;i<jobs.length;i+=3) batches.push(jobs.slice(i,i+3));
@@ -142,7 +149,8 @@ $('cGo').onclick = async ()=>{
       done+=bt.length; frac=done/jobs.length; stage=stage.replace(/\(\d+\/\d+\)/, `(${done}/${jobs.length})`); } }));
     step=2; stage='Placing everything on the map'; show(); const geo=await geoP;
     step=3; stage='Saving the tour'; show();
-    const s2 = await fn({mode:'create_assemble', outline, texts, geo, where, group:form.group, form}, 60000);
+    let s2=null; for(let a=0;a<3;a++){ try{ s2=await fn({mode:'create_assemble', outline, texts, geo, where, group:form.group, form}, 60000); if(s2.ok) break; }catch(e){ await new Promise(ok=>setTimeout(ok,3000)); } }
+    if(!s2) throw new Error('could not save; check signal and try again');
     if(!s2.ok || !s2.j.tour) throw new Error(s2.j.detail||s2.j.error||'could not save');
     const tour=s2.j.tour;
     store.set('rhrn_tourdata_'+tour.id, tour); rememberTour(tour);

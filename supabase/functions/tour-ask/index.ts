@@ -2,7 +2,7 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 
 // Right Here, Right Now: one function for the guide.
 //   mode "ask" (default): answer a question (with web search), or propose a new plan via the update_plan tool
-//   modes "create_outline" / "create_narrate" / "create_geocode" / "create_assemble": build a new tour in steps, save to rhrn_tours
+//   modes "create_outline_job" / "create_narrate" / "create_geocode" / "create_assemble": build a new tour in steps, save to rhrn_tours
 //   mode "save_plan": store the group's current plan in rhrn_tour_plans
 //   mode "delete_tour": delete a shared tour (owner PIN)
 
@@ -385,6 +385,25 @@ async function doAssemble(body: any) {
   return json({ tour, saved: ins.ok });
 }
 
+// Long steps run in the background so a dropped phone connection can't break them:
+// the app gets a job id right away and polls rhrn_jobs for the result.
+declare const EdgeRuntime: { waitUntil(p: Promise<unknown>): void };
+function startJob(work: () => Promise<Response>) {
+  const id = crypto.randomUUID();
+  const run = (async () => {
+    await rest("rhrn_jobs", "POST", { id, status: "running" });
+    let patch: Record<string, unknown>;
+    try {
+      const r = await work();
+      const j = await r.json().catch(() => ({}));
+      patch = r.ok ? { status: "done", result: j } : { status: "error", error: S(j.detail || j.error || r.status, 300) };
+    } catch (e) { patch = { status: "error", error: S(e, 300) }; }
+    await rest(`rhrn_jobs?id=eq.${id}`, "PATCH", { ...patch, updated_at: new Date().toISOString() });
+  })();
+  EdgeRuntime.waitUntil(run);
+  return json({ job: id });
+}
+
 // Delete a shared tour for everyone. Needs the owner PIN (same one as the photo album).
 async function doDeleteTour(body: any) {
   const want = Deno.env.get("ALBUM_ADMIN_PIN");
@@ -419,6 +438,7 @@ Deno.serve(async (req: Request) => {
     if (body.mode === "delete_tour") return await doDeleteTour(body);
     const key = (Deno.env.get("ANTHROPIC_API_KEY_RHRN") || "").trim();
     if (!key) return json({ error: "not_configured" }, 503);
+    if (body.mode === "create_outline_job") return startJob(() => doOutline(key, body));
     if (body.mode === "create_outline") return await doOutline(key, body);
     if (body.mode === "create_narrate") return await doNarrate(key, body);
     if (body.mode === "create_geocode") return await doGeocode(body);
