@@ -300,7 +300,7 @@ async function runJob(body, maxMs){
     try{
       const res=await runJob({mode:'schedule_job', stops:list.map(s=>({id:s.id, name:s.name.replace(/\s*\(passing\)/,''), lat:s.lat, lng:s.lng, pass:/\(passing\)|drive-by/i.test(s.name), note:s.note||''})),
         anchor:$('sAnchor').value, time:$('sTime').value, date:$('sDate').value, city:T.city||T.title, transport:(T.request&&T.request.transport)||({walk:'Walking',walk_ride:'Walking + Uber',car:'Car'}[T.mode]||'Walking + Uber'), group:T.guestNotes||''});
-      res.madeAt=new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}); store.set(SK+'sched', res); renderSchedule(res);
+      res.madeAt=new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}); res.v=Date.now(); res.by=store.get('cdj_who','')||''; store.set(SK+'sched', res); renderSchedule(res); shareSchedule(res);
       if(res.summary) speak(res.summary);
     }catch(e){ $('schedOut').innerHTML='<div class="status bad">Could not build the schedule: '+esc(e.message||e)+'</div>'; }
     finally{ clearInterval(tick); $('sGo').disabled=false; $('sGo').textContent='Build schedule'; }
@@ -380,3 +380,24 @@ function liveSchedule(){
 window.liveSchedule = liveSchedule;
 setInterval(liveSchedule, 30000);
 document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) liveSchedule(); });
+
+// ---------- shared schedule: everyone on the tour sees the latest one built ----------
+async function shareSchedule(res){
+  store.set(SK+'schedPending', true);
+  try{ const r=await fetch(`${SB}/rest/v1/rhrn_schedules?on_conflict=tour_id`, {method:'POST', headers:{apikey:SBK, Authorization:'Bearer '+SBK, 'Content-Type':'application/json', Prefer:'resolution=merge-duplicates,return=minimal'},
+      body:JSON.stringify({tour_id:T.id, v:res.v, sched:res, updated_by:res.by||'', updated_at:new Date().toISOString()})});
+    if(r.ok) store.set(SK+'schedPending', false); }catch(e){}
+}
+async function syncSchedule(){
+  if(!navigator.onLine) return;
+  const mine=store.get(SK+'sched',null);
+  if(store.get(SK+'schedPending',false) && mine){ await shareSchedule(mine); return; }
+  try{ const r=await fetch(`${SB}/rest/v1/rhrn_schedules?tour_id=eq.${encodeURIComponent(T.id)}&select=v,sched,updated_by`, {headers:{apikey:SBK, Authorization:'Bearer '+SBK}, cache:'no-store'});
+    const rows=await r.json(); if(!Array.isArray(rows)||!rows.length) return;
+    const row=rows[0]; if(row.v > ((mine&&mine.v)||0) && row.sched){ row.sched.v=row.v; store.set(SK+'sched', row.sched); renderSchedule(row.sched);
+      $('schedMeta').textContent = 'shared'+(row.updated_by?' by '+row.updated_by:'')+(row.sched.madeAt?' · '+row.sched.madeAt:'');
+      if(mine) toast('🕒 Schedule updated'+(row.updated_by?' by '+row.updated_by:'')); }
+  }catch(e){}
+}
+setTimeout(syncSchedule, 2500); setInterval(syncSchedule, 45000); window.addEventListener('online', syncSchedule);
+document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) { syncSchedule(); syncPlan(); } });
