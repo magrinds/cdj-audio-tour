@@ -313,8 +313,8 @@ async function runJob(body, maxMs){
 })();
 function toM(t){ const m=/^(\d{1,2}):(\d{2})/.exec(t||''); return m ? +m[1]*60 + +m[2] : NaN; }
 function fmtM(m){ m=((Math.round(m)%1440)+1440)%1440; return String(Math.floor(m/60)).padStart(2,'0')+':'+String(m%60).padStart(2,'0'); }
-function durTxt(d){ return d<60 ? `${d} min` : `${Math.floor(d/60)} h ${d%60} min`; }
-function relTxt(d){ d=Math.round(d); if(d<=0) return 'now'; if(d<60) return `in ${d} min`; return `in ${Math.floor(d/60)} h ${d%60} min`; }
+function durTxt(d){ if(!isFinite(d)) return ''; return d<60 ? `${d} min` : `${Math.floor(d/60)} h ${d%60} min`; }
+function relTxt(d){ d=Math.round(d); if(!isFinite(d)) return ''; if(d<=0) return 'now'; if(d<60) return `in ${d} min`; return `in ${Math.floor(d/60)} h ${d%60} min`; }
 function renderSchedule(r){
   const icon=l=>l.mode==='walk'?'🚶':'🚗';
   const legTxt=l=>l.mode==='walk' ? `Walk about ${l.min} min (${l.km.toFixed(1)} km)` : `Ride about ${l.min} min (${l.km.toFixed(1)} km): ~${l.wait} min to get a car, traffic ×${(+l.factor).toFixed(1)}`;
@@ -332,7 +332,10 @@ function renderSchedule(r){
 // Live ETAs: worked out on the phone (offline) from the clock, GPS, and which stops have played.
 function liveSchedule(){
   const r = store.get(SK+'sched', null); const box=$('liveBox'); if(!r || r.cleared || !box) return;
-  if(r.stale){ box.innerHTML='<div class="warn" style="margin:0 0 8px">⚠️ The plan changed since this schedule was built. Tick "Only stops not heard yet" and tap <b>Build schedule</b> to update it.</div>'; return; }
+  // also stale if the schedule's stops no longer match the current plan (e.g. built on another phone before a change)
+  const ids=new Set(STOPS.map(x=>x.id)), rowIds=(r.rows||[]).map(x=>x.id).filter(id=>id && id!=='here');
+  const drift = rowIds.some(id=>!ids.has(id)) || STOPS.some(x=>!played.has(x.id) && !rowIds.includes(x.id) && rowIds.length);
+  if(r.stale || drift){ box.innerHTML='<div class="warn" style="margin:0 0 8px">⚠️ The plan changed since this schedule was built. Tick "Only stops not heard yet" and tap <b>Build schedule</b> to update it.</div>'; return; }
   const now=new Date(), p=n=>String(n).padStart(2,'0');
   const today=`${now.getFullYear()}-${p(now.getMonth()+1)}-${p(now.getDate())}`;
   if(r.date && r.date!==today){ box.innerHTML=`<div class="status" style="margin:0 0 6px">Live times start on ${esc(r.date)}.</div>`; return; }
@@ -359,12 +362,14 @@ function liveSchedule(){
       const leg=x.leg||{min:0};
       if(atStop || !lastFix){ const leave=Math.max(nowM, t0 + (x.visit||0)); eta[n]=leave + leg.min; }
       else { const nx=STOPS.find(s=>s.id===rows[n].id) || rows[n]; const from=st||x;
-        const full = (nx && from && isFinite(nx.lat)) ? Math.max(0.05, dist(from.lat,from.lng,nx.lat,nx.lng)) : 1;
-        const left = (nx && isFinite(nx.lat)) ? dist(lastFix.lat,lastFix.lng,nx.lat,nx.lng) : full;
-        eta[n] = nowM + leg.min * Math.min(1, Math.max(0.1, left/full)); }
+        const full = (nx && from && isFinite(nx.lat) && isFinite(from.lat)) ? Math.max(0.05, dist(from.lat,from.lng,nx.lat,nx.lng)) : NaN;
+        const left = (nx && isFinite(nx.lat)) ? dist(lastFix.lat,lastFix.lng,nx.lat,nx.lng) : NaN;
+        const frac = (isFinite(full) && isFinite(left)) ? Math.min(1, Math.max(0.1, left/full)) : 1;
+        eta[n] = nowM + (+leg.min||0) * frac; }
+      if(!isFinite(eta[n])) eta[n] = Math.max(nowM, (isFinite(t0)?t0:nowM) + (+x.visit||0)) + (+leg.min||0);
     }
   }
-  for(let i=n+1;i<rows.length;i++) eta[i] = eta[i-1] + (rows[i-1].visit||0) + ((rows[i-1].leg||{}).min||0);
+  for(let i=n+1;i<rows.length;i++) eta[i] = eta[i-1] + (+rows[i-1].visit||0) + (+(rows[i-1].leg||{}).min||0);
   const lastI=rows.length-1;
   const finishEta = n<=lastI ? eta[lastI] + (rows[lastI].visit||0) : nowM;
   const delay = n<=lastI ? Math.round(eta[n] - toM(rows[n].arrive)) : Math.round(finishEta - toM(r.finish));
