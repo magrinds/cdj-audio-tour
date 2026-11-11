@@ -36,7 +36,7 @@ Deno.serve(async (req: Request) => {
     const head = await fetch(url, { method: "HEAD" });
     if (head.ok) return json({ url, cached: true });
 
-    const key = (Deno.env.get("ELEVENLABS_API_KEY") || "").trim();
+    const key = (Deno.env.get("RHRN_Eleven_Labs") || Deno.env.get("ELEVENLABS_API_KEY") || "").trim();
     if (!key) return json({ error: "not_configured" }, 503);
     const r = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voice}?output_format=mp3_44100_64`, {
       method: "POST",
