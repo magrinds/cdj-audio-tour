@@ -290,7 +290,6 @@ async function runJob(body, maxMs){
   const setDefaultTime=()=>{ if($('sAnchor').value==='end') $('sTime').value = req.end || '17:00';
     else $('sTime').value = $('sRemaining').checked ? `${p(now.getHours())}:${p(Math.ceil(now.getMinutes()/5)*5%60)}` : (req.time || '10:00'); };
   setDefaultTime(); $('sAnchor').onchange=setDefaultTime; $('sRemaining').onchange=setDefaultTime;
-  const saved=store.get(SK+'sched',null); if(saved && !saved.cleared) renderSchedule(saved);
   $('sGo').onclick=async ()=>{
     if(!navigator.onLine){ $('schedOut').innerHTML='<div class="status bad">Building a schedule needs signal. Your last schedule stays here offline.</div>'; return; }
     let list=STOPS.filter(s=>isFinite(s.lat));
@@ -305,11 +304,12 @@ async function runJob(body, maxMs){
     }catch(e){ $('schedOut').innerHTML='<div class="status bad">Could not build the schedule: '+esc(e.message||e)+'</div>'; }
     finally{ clearInterval(tick); $('sGo').disabled=false; $('sGo').textContent='Build schedule'; }
   };
+  const saved=store.get(SK+'sched',null); if(saved && !saved.cleared){ try{ renderSchedule(saved); }catch(e){ console.error(e); } }
 })();
-const toM = t => { const m=/^(\d{1,2}):(\d{2})/.exec(t||''); return m ? +m[1]*60 + +m[2] : NaN; };
-const fmtM = m => { m=((Math.round(m)%1440)+1440)%1440; return String(Math.floor(m/60)).padStart(2,'0')+':'+String(m%60).padStart(2,'0'); };
-const durTxt = d => d<60 ? `${d} min` : `${Math.floor(d/60)} h ${d%60} min`;
-const relTxt = d => { d=Math.round(d); if(d<=0) return 'now'; if(d<60) return `in ${d} min`; return `in ${Math.floor(d/60)} h ${d%60} min`; };
+function toM(t){ const m=/^(\d{1,2}):(\d{2})/.exec(t||''); return m ? +m[1]*60 + +m[2] : NaN; }
+function fmtM(m){ m=((Math.round(m)%1440)+1440)%1440; return String(Math.floor(m/60)).padStart(2,'0')+':'+String(m%60).padStart(2,'0'); }
+function durTxt(d){ return d<60 ? `${d} min` : `${Math.floor(d/60)} h ${d%60} min`; }
+function relTxt(d){ d=Math.round(d); if(d<=0) return 'now'; if(d<60) return `in ${d} min`; return `in ${Math.floor(d/60)} h ${d%60} min`; }
 function renderSchedule(r){
   const icon=l=>l.mode==='walk'?'🚶':'🚗';
   const legTxt=l=>l.mode==='walk' ? `Walk about ${l.min} min (${l.km.toFixed(1)} km)` : `Ride about ${l.min} min (${l.km.toFixed(1)} km): ~${l.wait} min to get a car, traffic ×${(+l.factor).toFixed(1)}`;
