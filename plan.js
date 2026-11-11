@@ -290,7 +290,7 @@ async function runJob(body, maxMs){
   const setDefaultTime=()=>{ if($('sAnchor').value==='end') $('sTime').value = req.end || '17:00';
     else $('sTime').value = $('sRemaining').checked ? `${p(now.getHours())}:${p(Math.ceil(now.getMinutes()/5)*5%60)}` : (req.time || '10:00'); };
   setDefaultTime(); $('sAnchor').onchange=setDefaultTime; $('sRemaining').onchange=setDefaultTime;
-  const saved=store.get(SK+'sched',null); if(saved) renderSchedule(saved);
+  const saved=store.get(SK+'sched',null); if(saved && !saved.cleared) renderSchedule(saved);
   $('sGo').onclick=async ()=>{
     if(!navigator.onLine){ $('schedOut').innerHTML='<div class="status bad">Building a schedule needs signal. Your last schedule stays here offline.</div>'; return; }
     let list=STOPS.filter(s=>isFinite(s.lat));
@@ -326,7 +326,7 @@ function renderSchedule(r){
 }
 // Live ETAs: worked out on the phone (offline) from the clock, GPS, and which stops have played.
 function liveSchedule(){
-  const r = store.get(SK+'sched', null); const box=$('liveBox'); if(!r || !box) return;
+  const r = store.get(SK+'sched', null); const box=$('liveBox'); if(!r || r.cleared || !box) return;
   const now=new Date(), p=n=>String(n).padStart(2,'0');
   const today=`${now.getFullYear()}-${p(now.getMonth()+1)}-${p(now.getDate())}`;
   if(r.date && r.date!==today){ box.innerHTML=`<div class="status" style="margin:0 0 6px">Live times start on ${esc(r.date)}.</div>`; return; }
@@ -395,12 +395,24 @@ async function syncSchedule(){
   try{ const r=await fetch(`${SB}/rest/v1/rhrn_schedules?tour_id=eq.${encodeURIComponent(T.id)}&select=v,sched,updated_by`, {headers:{apikey:SBK, Authorization:'Bearer '+SBK}, cache:'no-store'});
     const rows=await r.json(); if(!Array.isArray(rows)) return;
     // a schedule built on this phone that the server doesn't have yet (e.g. built before sharing existed): upload it
-    if(mine && (!rows.length || ((mine.v||0) > rows[0].v))){ if(!mine.v){ mine.v=Date.now(); store.set(SK+'sched', mine); } await shareSchedule(mine); return; }
+    if(mine && !mine.cleared && (!rows.length || ((mine.v||0) > rows[0].v))){ if(!mine.v){ mine.v=1; store.set(SK+'sched', mine); } await shareSchedule(mine); return; }
     if(!rows.length) return;
-    const row=rows[0]; if(row.v > ((mine&&mine.v)||0) && row.sched){ row.sched.v=row.v; store.set(SK+'sched', row.sched); renderSchedule(row.sched);
+    const row=rows[0];
+    if(row.v > ((mine&&mine.v)||0) && row.sched && row.sched.cleared){ store.set(SK+'sched', {cleared:true, v:row.v}); clearScheduleUI(); if(mine && !mine.cleared) toast('🕒 Schedule cleared'); return; }
+    if(row.v > ((mine&&mine.v)||0) && row.sched){ row.sched.v=row.v; store.set(SK+'sched', row.sched); renderSchedule(row.sched);
       $('schedMeta').textContent = 'shared'+(row.updated_by?' by '+row.updated_by:'')+(row.sched.madeAt?' · '+row.sched.madeAt:'');
       if(mine) toast('🕒 Schedule updated'+(row.updated_by?' by '+row.updated_by:'')); }
   }catch(e){}
 }
 setTimeout(syncSchedule, 2500); setInterval(syncSchedule, 45000); window.addEventListener('online', syncSchedule);
 document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) { syncSchedule(); syncPlan(); } });
+
+function clearScheduleUI(){ $('schedOut').innerHTML=''; $('schedMeta').innerHTML=''; }
+// Clear: wipes the schedule on every phone on this tour (a newer "cleared" marker wins everywhere)
+$('sClear').onclick = async ()=>{
+  if(!confirm('Clear the schedule for everyone on this tour?')) return;
+  const mark={cleared:true, v:Date.now()}; store.set(SK+'sched', mark); clearScheduleUI();
+  try{ await fetch(`${SB}/rest/v1/rhrn_schedules?on_conflict=tour_id`, {method:'POST', headers:{apikey:SBK, Authorization:'Bearer '+SBK, 'Content-Type':'application/json', Prefer:'resolution=merge-duplicates,return=minimal'},
+    body:JSON.stringify({tour_id:T.id, v:mark.v, sched:mark, updated_by:'', updated_at:new Date().toISOString()})}); toast('Schedule cleared'); }
+  catch(e){ store.set(SK+'schedPending', true); toast('Cleared here; will clear for others when you have signal'); }
+};
