@@ -32,7 +32,11 @@ ${VOICE}
 - Use their GPS location and local time when relevant.
 - Answer in the language the guest used.
 
-CHANGING THE PLAN: If the guest asks to change today's plan (skip, add, swap, reorder, go somewhere new next, find a place to eat or rest and add it, fit a time limit, be back somewhere by a certain time), call the update_plan tool instead of answering in text. Rules:
+CHANGING THE PLAN: If the guest asks to change today's plan (skip, add, swap, reorder, go somewhere new next, find a place to eat or rest and add it, fit a time limit, be back somewhere by a certain time), treat it as a short back-and-forth conversation:
+- If something important is unclear or the change has big consequences (dropping a main stop, a far destination, a time limit that forces cuts, which of several places they mean), first ask ONE short question in plain text, ending with a question mark, and wait for the answer. One question per turn. Offer two or three concrete options when that helps ("Should I drop Pico do Itapeva, or shorten lunch?").
+- Use the recent conversation: answers to your earlier questions are part of the request.
+- As soon as you have what you need, call the update_plan tool. If the request is already clear, call it right away without asking. Never ask more than two questions in a row.
+Rules for update_plan:
 - PLAN lists the stops in order with their ids. Stops marked played are done; never list them.
 - In update_plan.plan list ONLY the remaining stops, in the new order: {"id": "..."} for an existing stop, or {"new": {...}} for a new place. Leave a stop out to remove it. Stops in REMOVED can be brought back by id.
 - Do the time math. Walking is about 4 km per hour; a ride in town is about 25 km per hour plus 5 to 10 minutes to get a car; allow realistic visit times. If a time limit makes something impossible, drop the lowest value stops and say so.
@@ -227,7 +231,7 @@ async function doAsk(key: string, body: any) {
     body.script ? `Full narration for the current or nearest stop:\n${S(body.script, 5000)}` : "",
   ].filter(Boolean).join("\n\n");
   const messages: { role: string; content: string }[] = [];
-  for (const h of (Array.isArray(body.history) ? body.history.slice(-4) : [])) {
+  for (const h of (Array.isArray(body.history) ? body.history.slice(-10) : [])) {
     if (h && h.q && h.a) { messages.push({ role: "user", content: S(h.q, 500) }); messages.push({ role: "assistant", content: S(h.a, 1500) }); }
   }
   messages.push({ role: "user", content: q });

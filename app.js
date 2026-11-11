@@ -601,7 +601,7 @@ function askContext(){
   return { lat:lastFix?lastFix.lat:null, lng:lastFix?lastFix.lng:null, near:n?n.stop.name:'', nearDist:n?fmt(n.d):'',
     playing: current?current.stop.name:'', local:new Date().toLocaleString('en-US',{timeZone:T.tz||undefined,weekday:'short',hour:'2-digit',minute:'2-digit'}),
     script: (current?current.stop.text:'') + '\n' + (n && n.d<1500 ? n.stop.text : ''),
-    trip: T.trip||'', city:T.city||T.title, guestNotes:T.guestNotes||'', overview: tourOverview(), history: askHist.slice(-4) };
+    trip: T.trip||'', city:T.city||T.title, guestNotes:T.guestNotes||'', overview: tourOverview(), history: askHist.slice(-10) };
 }
 let askViaVoice=false, askSearched=false;
 // one question at a time: lock Ask, the mic and the chips until the answer (or plan) comes back
@@ -616,32 +616,43 @@ async function ask(){
 }
 async function askInner(q){
   const viaVoice=askViaVoice; askViaVoice=false; askSearched=false;
-  $('askAns').textContent = /plan|skip|add|instead|change|reorder|back (at|to|by)|time|hour|minutes|tired|hungry/i.test(q) ? 'Thinking… (plan changes take about 30 seconds)' : 'Thinking…'; $('askSay').style.display='none';
+  // chat thread: your message, then the guide's reply bubble (which becomes #askAns)
+  { const th=$('askThread'); const old=$('askAns'); if(old) old.removeAttribute('id');
+    th.insertAdjacentHTML('beforeend', `<div class="bub me">${esc(q)}</div><div class="bub guide" id="askAns"></div>`);
+    $('askIn').value=''; }
+  $('askAns').textContent = /plan|skip|add|instead|change|reorder|back (at|to|by)|time|hour|minutes|tired|hungry|airport|stop/i.test(q) ? 'Thinking… (plan changes take about 30 seconds)' : 'Thinking…'; $('askSay').style.display='none';
+  scrollThread();
   let ans='', src='', errMsg='';
   if(navigator.onLine){
     try{ const body=Object.assign({question:q, tour_id:T.id}, askContext(), (window.planContext?window.planContext():{}));
       const r=await fetch(`${SB}/functions/v1/tour-ask`,{method:'POST',headers:{apikey:SBK,Authorization:'Bearer '+SBK,'Content-Type':'application/json'},body:JSON.stringify(body)});
       const j=await r.json();
-      if(r.ok && j.type==='plan' && window.onPlanProposal){ askHist.push({q, a:j.summary||'I proposed a new plan.'}); askHist=askHist.slice(-6); try{ sessionStorage.setItem(SK+'askhist',JSON.stringify(askHist)); }catch(e){} window.onPlanProposal(j, viaVoice); return; }
+      if(r.ok && j.type==='plan' && window.onPlanProposal){ askHist.push({q, a:j.summary||'I proposed a new plan.'}); askHist=askHist.slice(-12); try{ sessionStorage.setItem(SK+'askhist',JSON.stringify(askHist)); }catch(e){} window.onPlanProposal(j, viaVoice); return; }
       if(r.ok && j.answer){ ans=j.answer; src='Claude'; askSearched=!!j.searched; } else if(j.error==='not_configured'){ src='notcfg'; } else { src='err'; errMsg=(j.detail||j.error||('HTTP '+r.status)); } }catch(e){ src='err'; errMsg=String(e); }
   }
   if(!ans){ ans=localAnswer(q); if(ans) ans=(src==='notcfg'?'':'')+ans; }
   if(!ans) ans = navigator.onLine ? "That one isn't covered in my tour notes, and I can't reach Claude right now. Try asking staff nearby, or rephrase the question." : "I can't reach Claude without signal, and I didn't find that in the tour notes. Try again when you have signal.";
   $('askAns').innerHTML = ans.replace(/</g,'&lt;') + `<div class="status" style="margin-top:8px">${src==='Claude'?(askSearched?'Answered by Claude, checked on the web.':'Answered by Claude using your location.'):'From the tour notes on this phone (offline answer).'}${src==='notcfg'?' Claude answers need setup: see the owner note.':''}${src==='err'?' (Claude unavailable: '+errMsg.replace(/</g,'&lt;').slice(0,120)+')':''}</div>`;
-  if(src==='Claude'){ askHist.push({q, a:ans}); askHist=askHist.slice(-6); try{ sessionStorage.setItem(SK+'askhist',JSON.stringify(askHist)); }catch(e){} }
+  if(src==='Claude'){ askHist.push({q, a:ans}); askHist=askHist.slice(-12); try{ sessionStorage.setItem(SK+'askhist',JSON.stringify(askHist)); }catch(e){} }
   $('askSay').style.display=''; $('askSay').onclick=()=>sayAnswer(ans);
-  sayAnswer(ans);
+  scrollThread();
+  // the guide asked something back: when you spoke, listen for your answer right after it finishes talking
+  if(viaVoice && /\?\s*$/.test(ans) && src==='Claude'){ if(current && !paused) togglePause(); sayText(ans, ()=>{ if($('askSheet').classList.contains('open')) $('micBtn').click(); }); }
+  else sayAnswer(ans);
 }
+function scrollThread(){ const th=$('askThread'); if(th) th.scrollTop=th.scrollHeight; }
+function renderThread(){ const th=$('askThread'); if(!th || th.children.length) return;
+  th.innerHTML = askHist.map(h=>`<div class="bub me">${esc(h.q)}</div><div class="bub guide">${esc(h.a)}</div>`).join(''); scrollThread(); }
 $('askGo').onclick=()=>{ unlockAudio(); ask(); };
 $('askBtn').onclick=()=>{ const n=nearestStopInfo();
   $('askWhere').textContent = n? `Near: ${n.stop.name} (${fmt(n.d)})${current?' · playing: '+current.stop.name:''}` : 'Location unknown. Tap Start tour to turn on GPS.';
   const chips=['What am I looking at?','Where can we get a light snack nearby?','Tell me a fun fact about this place','How long should we spend here?'];
-  $('askChips').innerHTML='<button class="planchip">🗺 Change the plan…</button>'+chips.map(c=>`<button>${c}</button>`).join('');
-  $('askChips').querySelectorAll('button').forEach(b=>b.onclick=()=>{ if(b.classList.contains('planchip')){ $('askIn').value=''; $('askIn').placeholder='e.g. Skip the monastery, find a coffee near here, and get us back to the hotel by 5'; $('askIn').focus(); $('askAns').innerHTML='<div class="status">Say or type what you want to change: skip, add, reorder, or a time to be back. I\'ll propose a new plan for you to approve.</div>'; return; } $('askIn').value=b.textContent; unlockAudio(); ask(); });
-  $('askSheet').classList.add('open'); };
+  $('askChips').innerHTML='<button class="planchip">🗺 Change the plan…</button><button class="newchat">🧹 New chat</button>'+chips.map(c=>`<button>${c}</button>`).join('');
+  $('askChips').querySelectorAll('button').forEach(b=>b.onclick=()=>{ if(b.classList.contains('newchat')){ askHist=[]; try{ sessionStorage.setItem(SK+'askhist','[]'); }catch(e){} $('askThread').innerHTML=''; $('askSay').style.display='none'; return; } if(b.classList.contains('planchip')){ $('askIn').value=''; $('askIn').placeholder='e.g. Skip the monastery, find a coffee near here, and get us back to the hotel by 5'; $('askIn').focus(); $('askThread').insertAdjacentHTML('beforeend','<div class="bub guide">What would you like to change? Skip, add, reorder, or a time to be back. I\'ll ask a question or two if I need to, then show you the new plan to approve.</div>'); scrollThread(); return; } $('askIn').value=b.textContent; unlockAudio(); ask(); });
+  $('askSheet').classList.add('open'); renderThread(); };
 $('micBtn').onclick=()=>{
   const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
-  if(!SR){ $('askAns').textContent='Voice input is not supported in this browser. Type instead, or use your keyboard\'s microphone.'; return; }
+  if(!SR){ toast('Voice input is not supported in this browser. Type instead, or use your keyboard microphone.'); return; }
   const r=new SR(); r.lang='en-US'; r.interimResults=true; $('micBtn').textContent='🎙 Listening…';
   r.onresult=e=>{ $('askIn').value=[...e.results].map(x=>x[0].transcript).join(''); };
   r.onend=()=>{ $('micBtn').textContent='🎤 Speak'; if($('askIn').value.trim()){ askViaVoice=true; ask(); } };
