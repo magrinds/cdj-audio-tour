@@ -239,6 +239,8 @@ function applyStops(newStops, opts){
   queue = queue.filter(id=>findAny(id));
   BB=null; renderScripts(); fillWalkSel(); setGmap(); renderStops(); drawMap(); try{ renderWalk(); }catch(e){}
   if(!(opts&&opts.quiet)) fetchPhotos();
+  // the schedule was built for the old stop list: flag it
+  const sc=store.get(SK+'sched',null); if(sc && !sc.cleared){ const ids=new Set(STOPS.map(x=>x.id)); if(sc.rows.some(r=>r.id && r.id!=='here' && !ids.has(r.id)) || STOPS.some(x=>!sc.rows.find(r=>r.id===x.id) && !played.has(x.id))){ sc.stale=true; store.set(SK+'sched',sc); try{ liveSchedule(); }catch(e){} } }
 }
 function applyProposal(){
   if(!proposal) return;
@@ -327,6 +329,7 @@ function renderSchedule(r){
 // Live ETAs: worked out on the phone (offline) from the clock, GPS, and which stops have played.
 function liveSchedule(){
   const r = store.get(SK+'sched', null); const box=$('liveBox'); if(!r || r.cleared || !box) return;
+  if(r.stale){ box.innerHTML='<div class="warn" style="margin:0 0 8px">⚠️ The plan changed since this schedule was built. Tick "Only stops not heard yet" and tap <b>Build schedule</b> to update it.</div>'; return; }
   const now=new Date(), p=n=>String(n).padStart(2,'0');
   const today=`${now.getFullYear()}-${p(now.getMonth()+1)}-${p(now.getDate())}`;
   if(r.date && r.date!==today){ box.innerHTML=`<div class="status" style="margin:0 0 6px">Live times start on ${esc(r.date)}.</div>`; return; }
