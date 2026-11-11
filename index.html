@@ -199,7 +199,12 @@
     <div class="row maptabs"><button id="tabG" class="secondary on">Google map</button><button id="tabL" class="secondary">Live position (offline)</button></div>
     <div id="gwrap"><iframe id="gmap" title="Tour route on Google Maps" loading="lazy" referrerpolicy="no-referrer-when-downgrade" allowfullscreen></iframe>
       <div class="status" id="gNote"><span id="gNoteTxt"></span> <a id="gOpen" target="_blank" rel="noopener">Open in Google Maps ↗</a></div></div>
-    <svg id="map" viewBox="0 0 400 260" style="display:none"></svg>
+    <div id="mapWrap" style="position:relative;display:none"><svg id="map" viewBox="0 0 400 260" style="touch-action:none;width:100%;display:block"></svg>
+      <div style="position:absolute;right:6px;top:6px;display:flex;flex-direction:column;gap:6px">
+        <button id="mzIn" class="secondary" style="width:40px;height:40px;padding:0;font-size:22px">+</button>
+        <button id="mzOut" class="secondary" style="width:40px;height:40px;padding:0;font-size:22px">−</button>
+        <button id="mzMe" class="secondary" title="Follow me" style="width:40px;height:40px;padding:0;font-size:18px">⌖</button>
+        <button id="mzAll" class="secondary" title="Whole route" style="width:40px;height:40px;padding:0;font-size:16px">⤢</button></div></div>
     <div class="status" id="gpsInfo">GPS: off</div>
   </div>
 

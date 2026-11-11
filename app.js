@@ -95,21 +95,50 @@ function bounds(){ const pts=STOPS.filter(p=>isFinite(p.lat)&&isFinite(p.lng)); 
   const kx=Math.cos(((minLat+maxLat)/2)*Math.PI/180), s=Math.min(W/((maxLng-minLng)*kx), H/(maxLat-minLat));
   BB={minLat,maxLat,minLng,maxLng,kx,s,ox:(W-(maxLng-minLng)*kx*s)/2,oy:(H-(maxLat-minLat)*s)/2}; }
 function proj(lat,lng){ if(!BB) bounds(); return [BB.ox+(lng-BB.minLng)*BB.kx*BB.s, BB.oy+(BB.maxLat-lat)*BB.s]; }
+// ---------- live map zoom: pinch, drag, +/- buttons, follow me ----------
+let MZ={z:1,cx:W/2,cy:H/2,follow:false};
+function mapView(){ const svg=$('map'); if(!svg) return;
+  if(MZ.follow && lastFix){ const [x,y]=proj(lastFix.lat,lastFix.lng); MZ.cx=x; MZ.cy=y; }
+  if(MZ.z<=1){ MZ.z=1; MZ.cx=W/2; MZ.cy=H/2; }
+  const w=W/MZ.z, h=H/MZ.z; svg.setAttribute('viewBox',`${(MZ.cx-w/2).toFixed(2)} ${(MZ.cy-h/2).toFixed(2)} ${w.toFixed(2)} ${h.toFixed(2)}`);
+  const me=$('mzMe'); if(me) me.style.background=MZ.follow?'var(--accent2)':''; }
+function mapZoom(f, px, py){ const nz=Math.max(1,Math.min(40,MZ.z*f));
+  if(px!=null){ MZ.cx=px+(MZ.cx-px)*MZ.z/nz; MZ.cy=py+(MZ.cy-py)*MZ.z/nz; }
+  MZ.z=nz; drawMap(); }
+(function(){ const svg=$('map'); if(!svg) return;
+  const pts=new Map(); let start=null;
+  const toMap=(cx,cy)=>{ const r=svg.getBoundingClientRect(), w=W/MZ.z, h=H/MZ.z; return [MZ.cx-w/2+(cx-r.left)/r.width*w, MZ.cy-h/2+(cy-r.top)/r.height*h]; };
+  svg.addEventListener('pointerdown',e=>{ svg.setPointerCapture(e.pointerId); pts.set(e.pointerId,[e.clientX,e.clientY]); start={z:MZ.z,cx:MZ.cx,cy:MZ.cy,p:[...pts.values()].map(a=>a.slice())}; });
+  svg.addEventListener('pointermove',e=>{ if(!pts.has(e.pointerId)||!start) return; pts.set(e.pointerId,[e.clientX,e.clientY]);
+    const r=svg.getBoundingClientRect(), now=[...pts.values()];
+    if(now.length>=2 && start.p.length>=2){ const d=(a)=>Math.hypot(a[0][0]-a[1][0],a[0][1]-a[1][1]);
+      MZ.z=Math.max(1,Math.min(40,start.z*d(now)/Math.max(10,d(start.p)))); MZ.follow=false; drawMap(); }
+    else if(now.length===1 && start.z>1){ const dx=(now[0][0]-start.p[0][0])/r.width*W/MZ.z, dy=(now[0][1]-start.p[0][1])/r.height*H/MZ.z;
+      if(Math.abs(dx)+Math.abs(dy)>0.5){ MZ.follow=false; MZ.cx=start.cx-dx; MZ.cy=start.cy-dy; mapView(); } } });
+  const up=e=>{ pts.delete(e.pointerId); start=pts.size?{z:MZ.z,cx:MZ.cx,cy:MZ.cy,p:[...pts.values()].map(a=>a.slice())}:null; };
+  svg.addEventListener('pointerup',up); svg.addEventListener('pointercancel',up);
+  svg.addEventListener('wheel',e=>{ e.preventDefault(); const [x,y]=toMap(e.clientX,e.clientY); MZ.follow=false; mapZoom(e.deltaY<0?1.25:0.8,x,y); },{passive:false});
+  svg.addEventListener('dblclick',e=>{ const [x,y]=toMap(e.clientX,e.clientY); MZ.follow=false; mapZoom(2,x,y); });
+  const b=(id,f)=>{ const el=$(id); if(el) el.onclick=f; };
+  b('mzIn',()=>mapZoom(1.6)); b('mzOut',()=>mapZoom(1/1.6));
+  b('mzMe',()=>{ if(!lastFix){ $('gpsInfo').textContent='GPS: waiting for a position…'; return; } MZ.follow=!MZ.follow; if(MZ.follow && MZ.z<4) MZ.z=6; drawMap(); });
+  b('mzAll',()=>{ MZ={z:1,cx:W/2,cy:H/2,follow:false}; drawMap(); });
+})();
 function drawMap(){
-  const svg=$('map'); let h=''; bounds();
+  const svg=$('map'); let h=''; bounds(); const k=1/Math.sqrt(MZ.z); // markers shrink a bit as you zoom so they don't cover the route
   const route = ((T.mapRoute && !planEdited) ? T.mapRoute : STOPS.map(p=>p.id)).map(id=>STOPS.find(x=>x.id===id)).filter(p=>p&&isFinite(p.lat));
-  h+=`<polyline points="${route.map(p=>proj(p.lat,p.lng).join(',')).join(' ')}" fill="none" stroke="#7ea6e0" stroke-width="3" stroke-dasharray="6 5"/>`;
+  h+=`<polyline points="${route.map(p=>proj(p.lat,p.lng).join(',')).join(' ')}" fill="none" stroke="#7ea6e0" stroke-width="${3/MZ.z}" stroke-dasharray="${6/MZ.z} ${5/MZ.z}"/>`;
   STOPS.forEach((p,i)=>{ if(!isFinite(p.lat)) return; const [x,y]=proj(p.lat,p.lng);
     if(p.radius>0){ const r=Math.max(4,p.radius*BB.s/111320); h+=`<circle cx="${x}" cy="${y}" r="${r}" fill="#1d4ed8" opacity=".08"/>`; }
     const done=played.has(p.id);
-    h+=`<circle cx="${x}" cy="${y}" r="9" fill="${done?'#a8b6c9':'#1d4ed8'}"/><text x="${x}" y="${y+4}" text-anchor="middle" font-size="10" font-weight="700" fill="#fff">${i+1}</text>`;
-    if(p.mapLabel){ const below=(T.labelBelow||[]).includes(p.id); h+=`<text x="${x}" y="${below?y+23:y-13}" text-anchor="middle" font-size="11" fill="#1d2420">${esc(p.mapLabel)}</text>`; }
+    h+=`<circle cx="${x}" cy="${y}" r="${9*k/Math.sqrt(MZ.z)}" fill="${done?'#a8b6c9':'#1d4ed8'}"/><text x="${x}" y="${y+4*k/Math.sqrt(MZ.z)}" text-anchor="middle" font-size="${10*k/Math.sqrt(MZ.z)}" font-weight="700" fill="#fff">${i+1}</text>`;
+    if(p.mapLabel){ const below=(T.labelBelow||[]).includes(p.id); h+=`<text x="${x}" y="${below?y+23/MZ.z*k*Math.sqrt(MZ.z):y-13/MZ.z*k*Math.sqrt(MZ.z)}" text-anchor="middle" font-size="${11/MZ.z*k*Math.sqrt(MZ.z)}" fill="#1d2420">${esc(p.mapLabel)}</text>`; }
   });
   if(lastFix){ const [x,y]=proj(lastFix.lat,lastFix.lng);
-    const inside = x>-20&&x<W+20&&y>-20&&y<H+20;
-    if(inside){ h+=`<circle cx="${x}" cy="${y}" r="14" fill="#2b6cb0" opacity=".2"/><circle cx="${x}" cy="${y}" r="6" fill="#2b6cb0" stroke="#fff" stroke-width="2"/>`; }
+    const inside = true;
+    if(inside){ h+=`<circle cx="${x}" cy="${y}" r="${14/MZ.z}" fill="#2b6cb0" opacity=".2"/><circle cx="${x}" cy="${y}" r="${6/MZ.z}" fill="#2b6cb0" stroke="#fff" stroke-width="${2/MZ.z}"/>`; }
   }
-  svg.innerHTML=h;
+  svg.innerHTML=h; mapView();
 }
 
 
@@ -473,7 +502,7 @@ function setGmap(){ const g=(T.gmap && !planEdited) ? T.gmap : gmapFromStops(); 
   $('gOpen').href=g.open; $('gNoteTxt').textContent=g.note||''; }
 (function(){
   setGmap();
-  function show(g){ $('gwrap').style.display=g?'':'none'; $('map').style.display=g?'none':''; $('tabG').classList.toggle('on',g); $('tabL').classList.toggle('on',!g); store.set(SK+'maptab',g?'g':'l'); }
+  function show(g){ $('gwrap').style.display=g?'':'none'; $('mapWrap').style.display=g?'none':''; $('tabG').classList.toggle('on',g); $('tabL').classList.toggle('on',!g); store.set(SK+'maptab',g?'g':'l'); }
   $('tabG').onclick=()=>show(true); $('tabL').onclick=()=>show(false);
   const pref=store.get(SK+'maptab', navigator.onLine?'g':'l');
   show(navigator.onLine && pref==='g');
