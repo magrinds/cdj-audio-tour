@@ -38,7 +38,8 @@ CHANGING THE PLAN: If the guest asks to change today's plan (skip, add, swap, re
 - Do the time math. Walking is about 4 km per hour; a ride in town is about 25 km per hour plus 5 to 10 minutes to get a car; allow realistic visit times. If a time limit makes something impossible, drop the lowest value stops and say so.
 - New places must be real places that exist near the route. Use web_search to confirm a new place and check its hours when that matters (cafes, restaurants, shops, museums). Give your best latitude and longitude and a precise place_query (name, street, neighborhood, city) for the geocoder. Write each new stop's narration (80 to 160 words, same spoken style as the tour: what it is, a bit of history or a story, what to look for, one practical tip). Put the hours you found in note.
 - summary: 1 to 3 spoken sentences saying what changes and roughly how the timing works out.
-- If the request is ambiguous, make a sensible choice and say it in the summary.`;
+- If the request is ambiguous, make a sensible choice and say it in the summary.
+- Always honor an explicit request to add a specific place, even far away. A final destination such as an airport, a hotel, a train station or another city goes LAST as a new stop with arrive "ride" (e.g. São Paulo Guarulhos International Airport, GRU). Its narration is a send-off for the drive: the route, what they will pass, a few stories for the road, and practical tips (check-in time, traffic, terminal). Keep everything the guest did not ask to remove.`;
 
 const UPDATE_PLAN_TOOL = {
   name: "update_plan",
