@@ -1,6 +1,6 @@
-const CACHE = 'rhrn-v60';
+const CACHE = 'rhrn-v61';
 const MEDIA = 'rhrn-media-v1'; // photos and voice clips survive app updates
-const ASSETS = ['./', './index.html', './app.js', './plan.js', './qrcode.js', './tours/campos-do-jordao.js', './manifest.json', './icon.svg'];
+const ASSETS = ['./', './index.html', './app.js', './plan.js', './ui.js', './qrcode.js', './tours/campos-do-jordao.js', './manifest.json', './icon.svg'];
 self.addEventListener('install', e => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS.map(u => new Request(u, {cache: 'reload'})))).then(() => self.skipWaiting())); });
 self.addEventListener('activate', e => { e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k !== CACHE && k !== MEDIA).map(k => caches.delete(k)))).then(() => self.clients.claim())); });
 self.addEventListener('fetch', e => {

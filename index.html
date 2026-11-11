@@ -137,19 +137,49 @@
   .chips button.planchip { background:#fff7e6; color:#b45309; border:1px solid #fcd38a; }
   .sheet textarea, .sheet .inp { width:100%; font:inherit; padding:12px; border:1px solid var(--line); border-radius:12px; margin:6px 0 10px; }
   .hidep { display:flex; align-items:center; gap:6px; font-size:13px; color:var(--mute); margin:4px 0; } .hidep input { width:18px; height:18px; }
+
+  /* ---------- tabbed layout: Listen / Map / Plan / Ask ---------- */
+  header { padding:10px 14px 8px; }
+  header h1 { font-size:18px; }
+  .brand .tag { display:none; }
+  .brand .mark { width:26px; height:34px; }
+  .view { display:none; }
+  body[data-v=listen] #vListen, body[data-v=map] #vMap, body[data-v=plan] #vPlan { display:block; }
+  main { padding-bottom:170px; }
+  #tabs { position:fixed; left:0; right:0; bottom:0; z-index:25; background:#fff; border-top:1px solid var(--line); display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:4px; padding:6px 8px calc(8px + env(safe-area-inset-bottom)); box-shadow:0 -4px 16px rgba(11,42,91,.08); }
+  #tabs button { background:none; box-shadow:none; color:#334155; border-radius:14px; padding:4px 0; height:56px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:3px; font-size:12px; font-weight:600; }
+  #tabs button.on { background:#dbe6ff; color:#1e3a8a; font-weight:800; }
+  #tabs svg { width:22px; height:22px; }
+  #mini { position:fixed; left:0; right:0; bottom:calc(70px + env(safe-area-inset-bottom)); z-index:24; background:var(--deep); color:#fff; display:none; align-items:center; gap:10px; padding:8px 12px; }
+  body:not([data-v=listen]) #mini.has { display:flex; }
+  #mini .t { flex:1; min-width:0; font-size:14px; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  #mini button { padding:10px 16px; background:var(--accent2); color:#0b1d3d; box-shadow:none; }
+  #mini button.sec { background:#1e3a7a; color:#fff; }
+  .fabp, .fabr, .fab2, .fab3 { display:none !important; }
+  .fab { bottom:calc(86px + env(safe-area-inset-bottom)); }
+  .fab { display:none !important; }
+  #askSheet { bottom:calc(70px + env(safe-area-inset-bottom)); background:var(--bg); }
+  #askSheet .panel { max-height:none; height:100%; border-radius:0; }
+  #now .row button { flex:1; padding:14px 0; font-size:16px; }
+  #now .line { font-size:22px; }
+  #upNext { display:none; align-items:center; gap:12px; cursor:pointer; }
+  #upNext.has { display:flex; }
+  #upNext .k { font-size:12px; font-weight:700; color:var(--mute); text-transform:uppercase; letter-spacing:.04em; }
+  #upNext .n { font-size:17px; font-weight:700; color:var(--deep); }
+  #upNext .m { font-size:13px; color:var(--mute); }
+  #schedPill { display:none; margin:0 0 10px; padding:8px 12px; border-radius:999px; font-size:14px; font-weight:700; background:#eaf6ee; color:#14532d; border:1px solid #bfe3c9; }
+  #schedPill.late { background:#fff7e6; color:#92400e; border-color:#fcd38a; }
+  #vMap #gmap { height:62vh; }
 </style>
 </head>
-<body>
+<body data-v="listen">
 <header>
   <div class="brand"><svg class="mark" viewBox="56 30 128 170" aria-hidden="true"><g fill="none" stroke="#bfdbfe" stroke-linecap="round"><ellipse cx="120" cy="186" rx="60" ry="13" stroke-width="5" opacity=".5"/><ellipse cx="120" cy="186" rx="32" ry="7" stroke-width="6" opacity=".9"/></g><path d="M120 186 C 92 146, 64 120, 64 88 A 56 56 0 0 1 176 88 C 176 120, 148 146, 120 186 Z" fill="#fff"/><circle cx="120" cy="88" r="24" fill="#1d4ed8"/><path d="M112 76 L132 88 L112 100 Z" fill="#fff"/><path d="M141 74 q10 14 0 28" fill="none" stroke="#f59e0b" stroke-width="5" stroke-linecap="round"/></svg><div><h1>Right Here, Right Now<span style="color:#f59e0b">.</span></h1><div class="tag">STORIES WHERE YOU STAND</div></div></div>
   <div class="sub" id="sub">Loading tour…</div>
 </header>
 <main>
-  <div class="card tourbar">
-    <div class="t"><b id="tourName">…</b><span class="pill" id="planBadge" style="display:none">plan changed</span><div id="tourBlurb"></div></div>
-    <button class="secondary" id="qrBtn" title="Share by QR code" style="padding:10px 12px">🔗 Share</button>
-    <button class="secondary" id="tourBtn">Tours</button>
-  </div>
+<section class="view" id="vListen">
+  <div id="schedPill"></div>
   <div class="card">
     <button id="start">▶ Start tour</button>
     <div class="status" id="status">Tap Start to enable GPS, audio, and keep-screen-on. Then you can switch on airplane mode to test offline.</div>
@@ -192,8 +222,12 @@
       <button id="pauseBtn" class="secondary" disabled>Pause</button>
       <button id="stopBtn" class="secondary" disabled>Stop</button>
       <button id="skipBtn" class="secondary" disabled>Skip ▸</button>
+      <button id="camBtn" class="secondary" aria-label="Take a photo">📷</button>
     </div>
   </div>
+  <div class="card" id="upNext" role="button" tabindex="0"><div style="flex:1;min-width:0"><div class="k">Up next</div><div class="n" id="unName"></div><div class="m" id="unMeta"></div></div><span style="font-size:22px;color:var(--mute)">›</span></div>
+</section>
+<section class="view" id="vMap">
 
   <div class="card">
     <div class="row maptabs"><button id="tabG" class="secondary on">Google map</button><button id="tabL" class="secondary">Live position (offline)</button></div>
@@ -206,6 +240,14 @@
         <button id="mzMe" class="secondary" title="Follow me" style="width:40px;height:40px;padding:0;font-size:18px">⌖</button>
         <button id="mzAll" class="secondary" title="Whole route" style="width:40px;height:40px;padding:0;font-size:16px">⤢</button></div></div>
     <div class="status" id="gpsInfo">GPS: off</div>
+  </div>
+
+</section>
+<section class="view" id="vPlan">
+  <div class="card tourbar">
+    <div class="t"><b id="tourName">…</b><span class="pill" id="planBadge" style="display:none">plan changed</span><div id="tourBlurb"></div></div>
+    <button class="secondary" id="qrBtn" title="Share by QR code" style="padding:10px 12px">🔗 Share</button>
+    <button class="secondary" id="tourBtn">Tours</button>
   </div>
 
   <div class="card" id="schedCard">
@@ -261,9 +303,17 @@
       <div id="scripts"></div>
     </details>
   </div>
+</section>
 </main>
 
 
+<div id="mini"><div class="t" id="miniT"></div><button class="sec" id="miniRew" aria-label="Back 10 seconds">⏪ 10s</button><button id="miniPause">Pause</button></div>
+<nav id="tabs" aria-label="Functions">
+  <button data-v="listen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 14v-2a9 9 0 0 1 18 0v2"/><rect x="3" y="14" width="4" height="7" rx="1.5"/><rect x="17" y="14" width="4" height="7" rx="1.5"/></svg>Listen</button>
+  <button data-v="map"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2-6-2Z"/><path d="M9 4v14M15 6v14"/></svg>Map</button>
+  <button data-v="plan"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>Plan</button>
+  <button data-v="ask"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12Z"/></svg>Ask</button>
+</nav>
 <button class="fab" id="fab" aria-label="Add photo">📷<span class="badge" id="badge"></span></button>
 <button class="fabp" id="fabPause" style="display:none">⏸ Pause</button>
 <button class="fabr" id="fabRew" style="display:none">⏪ 10s</button>
@@ -276,7 +326,7 @@
   <label>Your name</label><input type="text" id="who" placeholder="e.g. Marcus">
   <div class="row"><button id="takeBtn" style="flex:1">Take photo</button><button id="pickBtn" class="secondary" style="flex:1">From gallery</button></div>
   <div class="status" id="upStatus">Photos upload right away when you have signal, or wait safely on this phone until you do.</div>
-  <div class="row" style="margin-top:12px"><button class="secondary" data-close="addSheet" style="flex:1">Close</button></div>
+  <div class="row" style="margin-top:12px"><button class="secondary" id="seeAlbum" style="flex:1">See the album</button><button class="secondary" data-close="addSheet" style="flex:1">Close</button></div>
 </div></div>
 <div class="sheet" id="reviewSheet"><div class="panel">
   <h2>Review your photos</h2>
@@ -365,7 +415,7 @@
   if(plan && Array.isArray(plan.stops) && plan.stops.length){ T.stops=plan.stops; window.TOUR_PLAN_EDITED=true; }
   window.TOUR=T;
   const load=src=>new Promise((res,rej)=>{ const s=document.createElement('script'); s.src=src; s.onload=res; s.onerror=rej; document.body.appendChild(s); });
-  await load('app.js'); await load('plan.js');
+  await load('app.js'); await load('plan.js'); await load('ui.js');
 })();
 </script>
 </body>

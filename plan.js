@@ -381,6 +381,7 @@ function liveSchedule(){
     ${n<=lastI?`<div style="font-size:14px">Next: <b>${esc(rows[n].name)}</b> ${relTxt(eta[n]-nowM)} (about ${fmtM(eta[n])})</div>
     <div style="font-size:13px;color:var(--mute)">Estimated finish ${fmtM(finishEta)}${r.anchor==='end'?` · must be done by ${esc(fmtM(toM(r.finish)+r.cushion))}`:''}${late?' · <b style="color:#b42318">past your spare time: skip a stop or ask the guide to trim the plan</b>':''}</div>`:''}
   </div>`;
+  try{ window.schedEta={}; rows.forEach((x,i)=>{ if(x.id && eta[i]!=null && isFinite(eta[i])) window.schedEta[x.id]=eta[i]; }); window.schedStatus=status; window.schedLate=late||delay>5; }catch(e){}
   rows.forEach((x,i)=>{ const el=document.querySelector(`#schedOut [data-row="${i}"]`); if(!el) return;
     const e=el.querySelector('.eta'), rel=el.querySelector('.rel');
     if(i<n || (i===k)){ el.style.opacity=.55; e.textContent='✓'; rel.textContent=''; return; }
