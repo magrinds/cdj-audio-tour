@@ -306,15 +306,77 @@ async function runJob(body, maxMs){
     finally{ clearInterval(tick); $('sGo').disabled=false; $('sGo').textContent='Build schedule'; }
   };
 })();
+const toM = t => { const m=/^(\d{1,2}):(\d{2})/.exec(t||''); return m ? +m[1]*60 + +m[2] : NaN; };
+const fmtM = m => { m=((Math.round(m)%1440)+1440)%1440; return String(Math.floor(m/60)).padStart(2,'0')+':'+String(m%60).padStart(2,'0'); };
+const durTxt = d => d<60 ? `${d} min` : `${Math.floor(d/60)} h ${d%60} min`;
+const relTxt = d => { d=Math.round(d); if(d<=0) return 'now'; if(d<60) return `in ${d} min`; return `in ${Math.floor(d/60)} h ${d%60} min`; };
 function renderSchedule(r){
   const icon=l=>l.mode==='walk'?'🚶':'🚗';
   const legTxt=l=>l.mode==='walk' ? `Walk about ${l.min} min (${l.km.toFixed(1)} km)` : `Ride about ${l.min} min (${l.km.toFixed(1)} km): ~${l.wait} min to get a car, traffic ×${(+l.factor).toFixed(1)}`;
   $('schedMeta').textContent = r.madeAt ? 'made '+r.madeAt : '';
   $('schedOut').innerHTML = `<div class="sched">
-    <div class="status" style="margin:0 0 4px"><b>${esc(r.start)} → ${esc(r.finish)}</b> · ${Math.floor(r.total/60)} h ${r.total%60} min, plus ${r.cushion} min spare (done by ${esc(r.finishWithCushion)})</div>
+    <div id="liveBox"></div>
+    <div class="status" style="margin:0 0 4px">Plan: <b>${esc(r.start)} → ${esc(r.finish)}</b> · ${Math.floor(r.total/60)} h ${r.total%60} min, plus ${r.cushion} min spare (done by ${esc(r.finishWithCushion)})</div>
     ${r.summary?`<div style="margin:4px 0 6px">${esc(r.summary)}</div>`:''}
     ${(r.warnings||[]).map(w=>`<div class="warn">⚠️ ${esc(w)}</div>`).join('')}
-    ${r.rows.map(x=>`<div class="r"><div class="t">${esc(x.arrive)}</div><div class="n">${esc(x.name)}${x.pass?' <small style="display:inline">(passing)</small>':''}<small>${x.visit?`Stay ~${x.visit} min, leave ${esc(x.depart)}`:''}${x.note?(x.visit?' · ':'')+esc(x.note):''}</small></div></div>${x.leg?`<div class="leg">${icon(x.leg)} ${esc(legTxt(x.leg))}${x.leg.note?' · '+esc(x.leg.note):''}</div>`:''}`).join('')}
-    <div class="status" style="margin-top:8px">Buffers included: walking +25%, rides +20% plus pickup wait, stops +10%, and ${r.cushion} min spare at the end.${r.routed?'':' Some legs used straight-line estimates.'}</div>
+    ${r.rows.map((x,i)=>`<div class="r" data-row="${i}"><div class="t">${esc(x.arrive)}<div class="eta" style="font-size:11px;font-weight:600"></div></div><div class="n">${esc(x.name)}${x.pass?' <small style="display:inline">(passing)</small>':''}<small>${x.visit?`Stay ~${x.visit} min, leave ${esc(x.depart)}`:''}${x.note?(x.visit?' · ':'')+esc(x.note):''}</small><small class="rel" style="font-weight:700"></small></div></div>${x.leg?`<div class="leg">${icon(x.leg)} ${esc(legTxt(x.leg))}${x.leg.note?' · '+esc(x.leg.note):''}</div>`:''}`).join('')}
+    <div class="status" style="margin-top:8px">Buffers included: walking +25%, rides +20% plus pickup wait, stops +10%, and ${r.cushion} min spare at the end.${r.routed?'':' Some legs used straight-line estimates.'} Live times update every 30 seconds from your GPS and the stops you've heard.</div>
   </div>`;
+  liveSchedule();
 }
+// Live ETAs: worked out on the phone (offline) from the clock, GPS, and which stops have played.
+function liveSchedule(){
+  const r = store.get(SK+'sched', null); const box=$('liveBox'); if(!r || !box) return;
+  const now=new Date(), p=n=>String(n).padStart(2,'0');
+  const today=`${now.getFullYear()}-${p(now.getMonth()+1)}-${p(now.getDate())}`;
+  if(r.date && r.date!==today){ box.innerHTML=`<div class="status" style="margin:0 0 6px">Live times start on ${esc(r.date)}.</div>`; return; }
+  const nowM = now.getHours()*60 + now.getMinutes() + now.getSeconds()/60;
+  const rows=r.rows, playedAt=store.get(SK+'playedAt',{});
+  const isDone = (x,i) => (x.id && x.id!=='here' && played.has(x.id)) || (x.id==='here' && i===0);
+  // last row reached and the next one to reach
+  let k=-1; rows.forEach((x,i)=>{ if(isDone(x,i)) k=i; });
+  const startM = toM(r.start);
+  if(k<0 && nowM < startM - 1){ // not started yet
+    box.innerHTML=`<div class="status" style="margin:0 0 6px;font-weight:700">Starts ${relTxt(startM-nowM)} at ${esc(r.start)}.</div>`;
+    rows.forEach((x,i)=>{ const el=document.querySelector(`#schedOut [data-row="${i}"]`); if(!el) return; el.querySelector('.eta').textContent=''; el.querySelector('.rel').textContent=''; el.style.opacity=''; });
+    return;
+  }
+  const eta = new Array(rows.length).fill(null);
+  let n;
+  if(k<0){ n=0; eta[0]=Math.max(nowM, startM); }
+  else {
+    n=k+1;
+    const x=rows[k]; const t0 = playedAt[x.id] ? (new Date(playedAt[x.id]).getHours()*60 + new Date(playedAt[x.id]).getMinutes()) : nowM;
+    const st = STOPS.find(s=>s.id===x.id);
+    const atStop = st && lastFix && dist(lastFix.lat,lastFix.lng,st.lat,st.lng) < 250;
+    if(n<rows.length){
+      const leg=x.leg||{min:0};
+      if(atStop || !lastFix){ const leave=Math.max(nowM, t0 + (x.visit||0)); eta[n]=leave + leg.min; }
+      else { const nx=STOPS.find(s=>s.id===rows[n].id) || rows[n]; const from=st||x;
+        const full = (nx && from && isFinite(nx.lat)) ? Math.max(0.05, dist(from.lat,from.lng,nx.lat,nx.lng)) : 1;
+        const left = (nx && isFinite(nx.lat)) ? dist(lastFix.lat,lastFix.lng,nx.lat,nx.lng) : full;
+        eta[n] = nowM + leg.min * Math.min(1, Math.max(0.1, left/full)); }
+    }
+  }
+  for(let i=n+1;i<rows.length;i++) eta[i] = eta[i-1] + (rows[i-1].visit||0) + ((rows[i-1].leg||{}).min||0);
+  const lastI=rows.length-1;
+  const finishEta = n<=lastI ? eta[lastI] + (rows[lastI].visit||0) : nowM;
+  const delay = n<=lastI ? Math.round(eta[n] - toM(rows[n].arrive)) : Math.round(finishEta - toM(r.finish));
+  const doneBy = toM(r.finishWithCushion);
+  const late = finishEta > doneBy;
+  const status = n>lastI ? '✅ Tour complete' : Math.abs(delay)<=5 ? '🟢 On track' : delay>0 ? `🟠 Running ${durTxt(delay)} behind` : `🔵 ${durTxt(-delay)} ahead`;
+  box.innerHTML = `<div style="margin:0 0 8px;padding:10px 12px;border-radius:12px;background:${late?'#fde8e8':delay>5?'#fff7e6':'#eaf6ee'};border:1px solid ${late?'#f5b5b5':delay>5?'#fcd38a':'#bfe3c9'}">
+    <div style="font-weight:800">${status}</div>
+    ${n<=lastI?`<div style="font-size:14px">Next: <b>${esc(rows[n].name)}</b> ${relTxt(eta[n]-nowM)} (about ${fmtM(eta[n])})</div>
+    <div style="font-size:13px;color:var(--mute)">Estimated finish ${fmtM(finishEta)}${r.anchor==='end'?` · must be done by ${esc(fmtM(toM(r.finish)+r.cushion))}`:''}${late?' · <b style="color:#b42318">past your spare time: skip a stop or ask the guide to trim the plan</b>':''}</div>`:''}
+  </div>`;
+  rows.forEach((x,i)=>{ const el=document.querySelector(`#schedOut [data-row="${i}"]`); if(!el) return;
+    const e=el.querySelector('.eta'), rel=el.querySelector('.rel');
+    if(i<n || (i===k)){ el.style.opacity=.55; e.textContent='✓'; rel.textContent=''; return; }
+    el.style.opacity=''; const d=Math.round(eta[i]-toM(x.arrive));
+    e.textContent = Math.abs(d)>=3 ? fmtM(eta[i]) : ''; e.style.color = d>5?'#b45309':d<-5?'#1d4ed8':'#2c7a3f';
+    rel.textContent = `${relTxt(eta[i]-nowM)}${Math.abs(d)>=3?` · ${d>0?durTxt(d)+' late':durTxt(-d)+' early'}`:''}`; rel.style.color = d>5?'#b45309':'var(--accent)'; });
+}
+window.liveSchedule = liveSchedule;
+setInterval(liveSchedule, 30000);
+document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) liveSchedule(); });

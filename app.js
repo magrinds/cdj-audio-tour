@@ -256,6 +256,8 @@ function saveState(){ store.set(SK+'state',{ started, paused, queue, cur: curren
 function startStop(id){
   const stop = findAny(id); if(!stop) return;
   lastActivity=Date.now();
+  try{ const m=store.get(SK+'playedAt',{}); if(!m[id]) { m[id]=Date.now(); store.set(SK+'playedAt',m); } }catch(e){}
+  setTimeout(()=>{ try{ window.liveSchedule && window.liveSchedule(); }catch(e){} }, 500);
   hush();
   paused=false;
   current = { stop, sentences: buildSeq(id, stop), idx:0, token:Math.random(), audioIdx:-1 };
