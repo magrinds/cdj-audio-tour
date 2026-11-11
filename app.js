@@ -602,8 +602,17 @@ function askContext(){
     trip: T.trip||'', city:T.city||T.title, guestNotes:T.guestNotes||'', overview: tourOverview(), history: askHist.slice(-4) };
 }
 let askViaVoice=false, askSearched=false;
+// one question at a time: lock Ask, the mic and the chips until the answer (or plan) comes back
+let asking=false;
+function askBusy(on){ asking=on; ['askGo','micBtn'].forEach(id=>{ const b=$(id); if(b){ b.disabled=on; b.style.opacity=on?.5:''; } });
+  $('askGo').textContent = on ? 'Thinking…' : 'Ask'; $('askChips').querySelectorAll('button').forEach(b=>{ b.disabled=on; b.style.opacity=on?.5:''; }); }
 async function ask(){
+  if(asking) return;
   const q=$('askIn').value.trim(); if(!q) return;
+  askBusy(true);
+  try{ await askInner(q); } finally { askBusy(false); }
+}
+async function askInner(q){
   const viaVoice=askViaVoice; askViaVoice=false; askSearched=false;
   $('askAns').textContent = /plan|skip|add|instead|change|reorder|back (at|to|by)|time|hour|minutes|tired|hungry/i.test(q) ? 'Thinking… (plan changes take about 30 seconds)' : 'Thinking…'; $('askSay').style.display='none';
   let ans='', src='', errMsg='';
