@@ -207,7 +207,10 @@ $('premium').checked = store.get('rhrn_premium', true); $('premium').onchange=()
 $('rate').value = store.get('cdj_rate','1'); $('rateVal').textContent=(+$('rate').value).toFixed(2);
 
 // ---------- premium voice (ElevenLabs via the tour-tts function), phone voice as fallback ----------
-const AUD = new Audio(); AUD.preload='auto';
+let AUD = new Audio(); AUD.preload='auto';
+let NEXTAUD = new Audio(); NEXTAUD.preload='auto'; // the next line, loaded while this one plays
+function preloadNext(seq, j){ const it=seq[j]; if(it==null || (typeof it==='object' && !it.t)) return; const t=seqText(it);
+  ttsUrl(t, seqText(seq[j-1]||''), seqText(seq[j+1]||'')).then(url=>{ if(!url || NEXTAUD.dataset.u===url) return; NEXTAUD.dataset.u=url; NEXTAUD.src=url; try{ NEXTAUD.load(); }catch(e){} }); }
 const TTS_KEY = 'rhrn_tts_urls';
 let ttsUrls = {}; try{ ttsUrls = JSON.parse(localStorage.getItem(TTS_KEY)||'{}'); }catch(e){}
 let ttsOff = false;                       // set when the server says premium voice isn't configured
@@ -281,10 +284,13 @@ function speakNext(){
       if(!current||current.token!==myToken||paused) return;
       if(!url){ phone(); return; }
       if(fellBack) return; // the phone voice already took this sentence
+      // already loaded in the spare player? swap so it starts with no gap
+      if(NEXTAUD.dataset.u===url && NEXTAUD.readyState>=2){ const t=AUD; AUD=NEXTAUD; NEXTAUD=t; try{ NEXTAUD.pause(); }catch(e){} NEXTAUD.onended=NEXTAUD.onerror=NEXTAUD.onplaying=null; NEXTAUD.dataset.u=''; try{ AUD.currentTime=0; }catch(e){} }
+      else AUD.src=url;
       AUD.onended=()=>{ if(!current||current.token!==myToken||paused) return; current.idx++; speakNext(); };
       AUD.onerror=()=>{ clearTimeout(timer); AUD.onended=AUD.onerror=null; phone(); };
-      AUD.onplaying=()=>{ clearTimeout(timer); AUD.onplaying=null; };
-      AUD.src=url; AUD.playbackRate=+$('rate').value; current.audioIdx=i;
+      AUD.onplaying=()=>{ clearTimeout(timer); AUD.onplaying=null; preloadNext(seq, i+1); };
+      AUD.playbackRate=+$('rate').value; current.audioIdx=i;
       AUD.play().catch(()=>{ clearTimeout(timer); AUD.onended=AUD.onerror=null; phone(); });
     });
     return;
