@@ -134,6 +134,7 @@
 <main>
   <div class="card tourbar">
     <div class="t"><b id="tourName">…</b><span class="pill" id="planBadge" style="display:none">plan changed</span><div id="tourBlurb"></div></div>
+    <button class="secondary" id="qrBtn" title="Share by QR code" style="padding:10px 12px">🔗 Share</button>
     <button class="secondary" id="tourBtn">Tours</button>
   </div>
   <div class="card">
@@ -294,10 +295,20 @@
   <div id="cProg" class="prog" style="display:none"><div class="bar"><div id="cBar"></div></div><div class="steps"><span data-s="0">Plan route</span><span data-s="1">Write stories</span><span data-s="2">Map</span><span data-s="3">Save</span></div></div>
   <div class="status" id="cStatus">Claude researches the places and writes dense narration: history, stories, what to look for. Needs signal; afterwards the tour works offline.</div>
 </div></div>
+<div class="sheet" id="shareSheet"><div class="panel" style="text-align:center">
+  <div class="row" style="justify-content:space-between"><h2 style="margin:0">🔗 Share this tour</h2><button class="secondary" data-close="shareSheet">Close</button></div>
+  <div class="status" style="margin:8px 0">Have your friend point their phone camera at this code to join.</div>
+  <div id="qrBox" style="background:#fff;padding:12px;border-radius:16px;display:inline-block;border:1px solid var(--line)"></div>
+  <div class="status" id="shareUrl" style="word-break:break-all;margin:8px 0"></div>
+  <div class="row"><button id="shareSys" style="flex:1">📤 Share…</button><button class="secondary" id="shareCopy" style="flex:1">📋 Copy link</button></div>
+  <div class="row" style="margin-top:8px" id="nfcRow"><button class="secondary" id="nfcWrite" style="flex:1">📶 Write to an NFC tag</button></div>
+  <div class="status" id="nfcMsg"></div>
+</div></div>
 <div class="toast" id="toast"></div>
 <div class="viewer" id="viewer"><img id="viewImg" alt="" crossorigin="anonymous">
   <div class="vbar"><button id="vShare">Share</button><button id="vSave" class="secondary">Save</button><button id="vDel" class="warn" style="display:none">🗑 Delete</button><button id="vClose" class="secondary">Close</button></div>
   <div class="vmsg" id="vMsg"></div></div>
+<script src="qrcode.js"></script>
 <script src="tours/campos-do-jordao.js"></script>
 <script>
 // Loader: pick the tour, apply any changed plan, then start the app.

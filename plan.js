@@ -70,10 +70,25 @@ function switchTour(id){
   store.set('rhrn_tour', id); location.href = tourLink(id);
 }
 $('tourBtn').onclick = openPicker;
-$('shareTour').onclick = async ()=>{
+$('qrBtn').onclick = ()=>$('shareTour').click();
+$('shareTour').onclick = ()=>{
   const url = tourLink(T.id), text = `${T.title} audio tour: open in Chrome, tap Start tour, allow location.`;
-  try{ if(navigator.share){ await navigator.share({title:T.title, text, url}); return; } }catch(e){ if(e && e.name==='AbortError') return; }
-  try{ await navigator.clipboard.writeText(url); toast('Link copied'); }catch(e){ prompt('Copy this link', url); }
+  $('pickSheet').classList.remove('open'); $('shareSheet').classList.add('open');
+  $('shareUrl').textContent = url;
+  try{ const q = qrcode(0, 'M'); q.addData(url); q.make(); $('qrBox').innerHTML = q.createSvgTag({cellSize:7, margin:2, scalable:true});
+    const svg=$('qrBox').querySelector('svg'); if(svg){ svg.style.width='min(72vw,300px)'; svg.style.height='auto'; svg.style.display='block'; } }
+  catch(e){ $('qrBox').textContent='Could not draw the QR code.'; }
+  $('shareSys').style.display = navigator.share ? '' : 'none';
+  $('shareSys').onclick = async ()=>{ try{ await navigator.share({title:T.title, text, url}); }catch(e){} };
+  $('shareCopy').onclick = async ()=>{ try{ await navigator.clipboard.writeText(url); toast('Link copied'); }catch(e){ prompt('Copy this link', url); } };
+  // Web NFC: only Chrome on Android supports it; it writes the link to a blank NFC sticker or card
+  const nfcOk = 'NDEFReader' in window;
+  $('nfcWrite').disabled = !nfcOk; $('nfcWrite').style.opacity = nfcOk ? '' : .5;
+  $('nfcMsg').textContent = nfcOk ? 'Writes the link to a blank NFC sticker or card. Anyone who taps it with their phone opens the tour.' : 'NFC writing needs Chrome on Android. Phones can\'t send links to each other over NFC anymore, so the QR code is the quickest way.';
+  $('nfcWrite').onclick = async ()=>{ if(!nfcOk) return;
+    try{ const w = new NDEFReader(); $('nfcMsg').textContent='Hold a blank NFC sticker or card to the back of your phone…';
+      await w.write({records:[{recordType:'url', data:url}]}); $('nfcMsg').innerHTML='<span class="ok">Done.</span> Tapping that tag now opens this tour.'; }
+    catch(e){ $('nfcMsg').innerHTML='<span class="bad">Could not write the tag: '+esc(e.message||e)+'</span>'; } };
 };
 $('resetPlan').onclick = ()=>{
   if(!planEdited){ toast('This tour is already on its original plan'); return; }
