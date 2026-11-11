@@ -202,7 +202,7 @@ const seqText = it => typeof it==='object' ? (it.t||'') : it;
 function prefetchSeq(seq, from){ if(!premiumOn() || !navigator.onLine) return;
   const items=seq.map(seqText); let i=from||0;
   const run=async()=>{ while(i<items.length){ const j=i++; if(items[j]) await ttsUrl(items[j], items[j-1], items[j+1]); } };
-  run(); run(); }
+  run(); }
 function hush(){ if(synth) synth.cancel(); try{ AUD.pause(); }catch(e){} AUD.onended=AUD.onerror=null; }
 function speakNext(){
   if(!current || paused) return;

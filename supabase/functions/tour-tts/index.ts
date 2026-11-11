@@ -21,6 +21,18 @@ async function sha(s: string) {
   return [...new Uint8Array(d)].map((b) => b.toString(16).padStart(2, "0")).join("").slice(0, 40);
 }
 
+function callEleven(key: string, voice: string, model: string, text: string, prev: string, next: string) {
+  return fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voice}?output_format=mp3_44100_64`, {
+    method: "POST",
+    headers: { "xi-api-key": key, "Content-Type": "application/json", Accept: "audio/mpeg" },
+    body: JSON.stringify({
+      text, model_id: model,
+      ...(prev ? { previous_text: prev } : {}), ...(next ? { next_text: next } : {}),
+      voice_settings: { stability: 0.5, similarity_boost: 0.75, style: 0.15, use_speaker_boost: true },
+    }),
+  });
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
   if (req.method !== "POST") return json({ error: "method" }, 405);
@@ -38,15 +50,14 @@ Deno.serve(async (req: Request) => {
 
     const key = (Deno.env.get("RHRN_Eleven_Labs") || Deno.env.get("ELEVENLABS_API_KEY") || "").trim();
     if (!key) return json({ error: "not_configured" }, 503);
-    const r = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voice}?output_format=mp3_44100_64`, {
-      method: "POST",
-      headers: { "xi-api-key": key, "Content-Type": "application/json", Accept: "audio/mpeg" },
-      body: JSON.stringify({
-        text, model_id: model,
-        ...(prev ? { previous_text: prev } : {}), ...(next ? { next_text: next } : {}),
-        voice_settings: { stability: 0.5, similarity_boost: 0.75, style: 0.15, use_speaker_boost: true },
-      }),
-    });
+    // the ElevenLabs plan allows only a few requests at once: wait and retry when busy
+    let r: Response = new Response(null, { status: 429 });
+    for (let attempt = 0; attempt < 6; attempt++) {
+      r = await callEleven(key, voice, model, text, prev, next);
+      if (r.status !== 429) break;
+      await r.body?.cancel();
+      await new Promise((ok) => setTimeout(ok, 800 + Math.random() * 1200 * (attempt + 1)));
+    }
     if (!r.ok) {
       const t = await r.text();
       console.error("elevenlabs error", r.status, t.slice(0, 300));

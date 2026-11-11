@@ -228,7 +228,7 @@ async function doAsk(key: string, body: any) {
     if (h && h.q && h.a) { messages.push({ role: "user", content: S(h.q, 500) }); messages.push({ role: "assistant", content: S(h.a, 1500) }); }
   }
   messages.push({ role: "user", content: q });
-  const req: Record<string, unknown> = { max_tokens: 4000, system: ASK_SYSTEM + "\n\n" + ctx, messages };
+  const req: Record<string, unknown> = { max_tokens: 6000, system: ASK_SYSTEM + "\n\n" + ctx, messages };
   req.tools = plan ? [WEB_SEARCH, UPDATE_PLAN_TOOL] : [WEB_SEARCH];
   const res = await claude(key, req);
   if (!res.ok) return json({ error: "llm", ...res.last }, 502);
@@ -275,7 +275,7 @@ async function doOutline(key: string, body: any) {
   const brief = briefOf(body);
   const t0 = Date.now();
   const res = await claude(key, {
-    max_tokens: 6000, system: CREATE_SYSTEM,
+    max_tokens: 16000, system: CREATE_SYSTEM,
     messages: [{ role: "user", content: `Plan the tour outline, then call tour_outline.\n${brief}` }],
     tools: [{ ...WEB_SEARCH, max_uses: 4 }, OUTLINE_TOOL],
   });
@@ -283,9 +283,9 @@ async function doOutline(key: string, body: any) {
   let tool = (res.j.content || []).find((c: any) => c.type === "tool_use" && c.name === "tour_outline");
   if (!tool) {
     const r2 = await claude(key, {
-      max_tokens: 5000, system: CREATE_SYSTEM,
-      messages: [{ role: "user", content: `Plan the tour outline.\n${brief}` }],
-      tools: [OUTLINE_TOOL], tool_choice: { type: "tool", name: "tour_outline" },
+      max_tokens: 16000, system: CREATE_SYSTEM,
+      messages: [{ role: "user", content: `Plan the tour outline from your own knowledge (no searching) and return it by calling tour_outline.\n${brief}` }],
+      tools: [OUTLINE_TOOL],
     });
     if (!r2.ok) return json({ error: "llm", ...r2.last }, 502);
     tool = (r2.j.content || []).find((c: any) => c.type === "tool_use");
@@ -315,7 +315,7 @@ async function doNarrate(key: string, body: any) {
   const jobs = (Array.isArray(body.jobs) ? body.jobs : []).slice(0, 6);
   const texts: Record<string, string> = {};
   await Promise.all(jobs.map(async (job: any) => {
-    const r = await claude(key, { max_tokens: 1500, system: NARRATOR + "\n\n" + ctx, messages: [{ role: "user", content: `${S(job.prompt, 1500)}Length: ${S(job.words, 20)} words.` }] });
+    const r = await claude(key, { max_tokens: 5000, system: NARRATOR + "\n\n" + ctx, messages: [{ role: "user", content: `${S(job.prompt, 1500)}Length: ${S(job.words, 20)} words.` }] });
     if (r.ok) texts[S(job.key, 20)] = (r.j.content || []).filter((c: any) => c.type === "text").map((c: any) => c.text).join("").trim();
   }));
   return json({ texts });

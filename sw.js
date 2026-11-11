@@ -1,4 +1,4 @@
-const CACHE = 'rhrn-v42';
+const CACHE = 'rhrn-v43';
 const MEDIA = 'rhrn-media-v1'; // photos and voice clips survive app updates
 const ASSETS = ['./', './index.html', './app.js', './plan.js', './tours/campos-do-jordao.js', './manifest.json', './icon.svg'];
 self.addEventListener('install', e => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS.map(u => new Request(u, {cache: 'reload'})))).then(() => self.skipWaiting())); });
