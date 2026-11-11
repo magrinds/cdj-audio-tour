@@ -24,24 +24,46 @@ planBadge();
 
 // ---------- tour picker ----------
 function localTours(){ return store.get('rhrn_mytours', []); }
-function rememberTour(t){ const L = localTours().filter(x=>x.id!==t.id); L.unshift({id:t.id, title:t.title, city:t.city, blurb:t.blurb}); store.set('rhrn_mytours', L.slice(0,30)); }
+function rememberTour(t){ store.set('rhrn_hidden', store.get('rhrn_hidden', []).filter(x=>x!==t.id)); const L = localTours().filter(x=>x.id!==t.id); L.unshift({id:t.id, title:t.title, city:t.city, blurb:t.blurb, request:t.request||null}); store.set('rhrn_mytours', L.slice(0,30)); }
 if(!T.builtin) rememberTour(T);
+let reqs = {};
 async function openPicker(){
+  $('recreate').style.display = T.request ? '' : 'none';
   $('pickSheet').classList.add('open');
   const builtins = Object.values(window.TOUR_DEFS||{}).map(t=>({id:t.id, title:t.title, city:t.city, blurb:t.blurb, tag:'Built in'}));
   let shared = [];
   const render = ()=>{
-    const seen = new Set(); const all = [];
+    const seen = new Set(store.get('rhrn_hidden', [])); const all = [];
     for(const t of builtins.concat(shared, localTours().map(x=>Object.assign({tag:'Saved on this phone'},x)))) if(!seen.has(t.id)){ seen.add(t.id); all.push(t); }
-    $('pickList').innerHTML = all.map(t=>`<div class="dest" data-tour="${esc(t.id)}"><div class="n">${esc(t.title)}${t.id===T.id?' <span style="color:var(--accent)">· current</span>':''}<div class="m">${esc(t.blurb||t.city||'')}${t.tag?' · '+esc(t.tag):''}</div></div>${t.id===T.id?'':`<button class="secondary" data-open="${esc(t.id)}" style="padding:8px 12px">Open</button>`}</div>`).join('');
+    reqs = {}; all.forEach(t=>{ if(t.request) reqs[t.id]=t.request; }); if(T.request) reqs[T.id]=T.request;
+    $('pickList').innerHTML = all.map(t=>`<div class="dest" data-tour="${esc(t.id)}"><div class="n">${esc(t.title)}${t.id===T.id?' <span style="color:var(--accent)">· current</span>':''}<div class="m">${esc(t.blurb||t.city||'')}${t.tag?' · '+esc(t.tag):''}</div></div>${reqs[t.id]?`<button class="secondary" data-recreate="${esc(t.id)}" style="padding:8px 10px;margin-right:4px" title="Recreate with the same answers">↻</button>`:''}${t.tag==='Built in'?'':`<button class="secondary" data-del="${esc(t.id)}" style="padding:8px 10px;margin-right:4px" title="Delete">🗑</button>`}${t.id===T.id?'':`<button class="secondary" data-open="${esc(t.id)}" style="padding:8px 12px">Open</button>`}</div>`).join('');
     $('pickList').querySelectorAll('[data-open]').forEach(b=>b.onclick=()=>switchTour(b.dataset.open));
+    $('pickList').querySelectorAll('[data-recreate]').forEach(b=>b.onclick=()=>openCreate(reqs[b.dataset.recreate]));
+    $('pickList').querySelectorAll('[data-del]').forEach(b=>b.onclick=()=>deleteTour(b.dataset.del, all.find(t=>t.id===b.dataset.del), ()=>{ shared=shared.filter(t=>t.id!==b.dataset.del); render(); }));
   };
   render();
   if(navigator.onLine){ $('pickStatus').textContent='Loading shared tours…';
-    try{ const r = await fetch(`${SB}/rest/v1/rhrn_tours?select=id,title,city,blurb,created_at&order=created_at.desc&limit=50`, {headers:{apikey:SBK, Authorization:'Bearer '+SBK}});
+    try{ const r = await fetch(`${SB}/rest/v1/rhrn_tours?select=id,title,city,blurb,created_at,request:data->request&order=created_at.desc&limit=50`, {headers:{apikey:SBK, Authorization:'Bearer '+SBK}});
       const j = await r.json(); if(Array.isArray(j)) shared = j.map(t=>Object.assign({tag:'Shared'}, t)); $('pickStatus').textContent=''; render(); }
     catch(e){ $('pickStatus').textContent='Could not load shared tours.'; } }
   else $('pickStatus').textContent='Offline: showing tours saved on this phone.';
+}
+async function deleteTour(id, t, done){
+  const name = (t && t.title) || id, pin = ownerPin();
+  const forgetHere = ()=>{ store.set('rhrn_mytours', localTours().filter(x=>x.id!==id)); store.set('rhrn_hidden', store.get('rhrn_hidden', []).concat(id).slice(-200)); try{ localStorage.removeItem('rhrn_tourdata_'+id); }catch(e){} };
+  if(!pin){
+    if(!confirm(`Remove "${name}" from this phone?\n\nIt stays in the shared list for others. To delete it for everyone, turn on Owner mode in Settings first.`)) return;
+    forgetHere(); toast('Removed from this phone');
+  } else {
+    if(!confirm(`Delete "${name}" for everyone? This can't be undone.`)) return;
+    if(!navigator.onLine){ toast('Deleting needs signal'); return; }
+    try{ const {ok,status} = await fn({mode:'delete_tour', tour_id:id, pin}, 20000);
+      if(status===401){ toast('Owner PIN no longer valid'); return; }
+      if(!ok) throw 0; forgetHere(); toast('Tour deleted'); }
+    catch(e){ toast('Could not delete. Try again with signal.'); return; }
+  }
+  if(id===T.id){ switchTour('campos-do-jordao'); return; }
+  done && done();
 }
 function switchTour(id){
   if(current && !paused) togglePause();
@@ -70,40 +92,64 @@ function renderChips(){
   document.querySelectorAll('#createSheet .chips button').forEach(b=>b.onclick=()=>{ const k=b.dataset.k, v=b.dataset.v;
     if(k==='likes'){ pickState.likes.has(v)?pickState.likes.delete(v):pickState.likes.add(v); } else pickState[k]=v; renderChips(); });
 }
-$('newTour').onclick = ()=>{ $('pickSheet').classList.remove('open'); $('createSheet').classList.add('open'); renderChips();
-  $('cWhere').value = store.get('rhrn_c_where',''); $('cStart').value = store.get('rhrn_c_start',''); $('cGroup').value = store.get('rhrn_c_group',''); };
+function defaultWhen(){ const d=new Date(); if(d.getHours()>=17) d.setDate(d.getDate()+1);
+  const p=n=>String(n).padStart(2,'0'); return { date:`${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}`, time: d.getHours()>=17||d.getHours()<9 ? '10:00' : `${p(d.getHours()+1)}:00` }; }
+function openCreate(req){
+  $('pickSheet').classList.remove('open'); $('createSheet').classList.add('open');
+  const w=defaultWhen(); $('cDate').value=w.date; $('cTime').value=w.time; $('cEnd').value='';
+  if(req){ if(req.time) $('cTime').value=req.time; if(req.end) $('cEnd').value=req.end; }
+  if(req){
+    $('cWhere').value=req.where||''; $('cStart').value=req.start||''; $('cGroup').value=req.group||''; $('cMore').value=req.more||'';
+    if(chipSets.len.includes(req.length)) pickState.len=req.length;
+    if(chipSets.mode.includes(req.transport)) pickState.mode=req.transport;
+    if(chipSets.pace.includes(req.pace)) pickState.pace=req.pace;
+    if(Array.isArray(req.interests)) pickState.likes=new Set(req.interests.filter(x=>chipSets.likes.includes(x)));
+    $('cStatus').innerHTML='Same answers as before. Change anything you like, then tap <b>Create tour</b>.';
+  } else {
+    $('cWhere').value = store.get('rhrn_c_where',''); $('cStart').value = store.get('rhrn_c_start',''); $('cGroup').value = store.get('rhrn_c_group',''); $('cMore').value = store.get('rhrn_c_more','');
+  }
+  renderChips();
+}
+$('newTour').onclick = ()=>openCreate(null);
+$('recreate').onclick = ()=>openCreate(T.request);
 $('cMic').onclick = ()=>{ const SR=window.SpeechRecognition||window.webkitSpeechRecognition; if(!SR){ toast('Voice input not supported here'); return; }
   const r=new SR(); r.lang='en-US'; r.interimResults=true; const base=$('cMore').value; $('cMic').textContent='🎙 Listening…';
   r.onresult=e=>{ $('cMore').value=(base?base+' ':'')+[...e.results].map(x=>x[0].transcript).join(''); }; r.onend=()=>{ $('cMic').textContent='🎤 Speak'; }; r.onerror=r.onend; r.start(); };
 $('cGo').onclick = async ()=>{
   const where=$('cWhere').value.trim(); if(!where){ $('cStatus').innerHTML='<span class="bad">Tell me where the tour is.</span>'; return; }
   if(!navigator.onLine){ $('cStatus').innerHTML='<span class="bad">Creating a tour needs signal.</span>'; return; }
-  store.set('rhrn_c_where',where); store.set('rhrn_c_start',$('cStart').value); store.set('rhrn_c_group',$('cGroup').value);
+  store.set('rhrn_c_where',where); store.set('rhrn_c_start',$('cStart').value); store.set('rhrn_c_group',$('cGroup').value); store.set('rhrn_c_more',$('cMore').value);
   $('cGo').disabled=true; const t0=Date.now(); let stage='Claude is researching places and planning the route';
-  const show=()=>{ $('cStatus').textContent=`${stage}… ${Math.round((Date.now()-t0)/1000)}s. Usually 2 to 3 minutes; keep this screen open.`; };
+  // progress bar: planning creeps 2-25% over ~90s, writing 25-88% by stories done, map 88-95, save 95-100
+  let step=0, frac=0;
+  const pct=()=>{ const el=(Date.now()-t0)/1000; return step===0 ? 2+23*(1-Math.exp(-el/45)) : step===1 ? 25+63*frac : step===2 ? 90 : 97; };
+  const show=()=>{ $('cProg').style.display=''; $('cBar').style.width=pct().toFixed(1)+'%';
+    document.querySelectorAll('#cProg [data-s]').forEach(e=>{ const i=+e.dataset.s; e.className = i<step?'done':i===step?'on':''; });
+    $('cStatus').textContent=`${stage}… ${Math.round((Date.now()-t0)/1000)}s. Usually 2 to 3 minutes; keep this screen open.`; };
   const tick=setInterval(show,1000); show();
-  const form={where, start:$('cStart').value.trim(), length:pickState.len, transport:pickState.mode, pace:pickState.pace,
+  const form={where, start:$('cStart').value.trim(), date:$('cDate').value, time:$('cTime').value, end:$('cEnd').value, length:pickState.len, transport:pickState.mode, pace:pickState.pace,
     interests:[...pickState.likes], group:$('cGroup').value.trim(), more:$('cMore').value.trim(), lat:lastFix?lastFix.lat:null, lng:lastFix?lastFix.lng:null,
     local:new Date().toString().slice(0,24)};
   try{
     const o = await fn(Object.assign({mode:'create_outline'}, form), 150000);
     if(!o.ok || !o.j.outline) throw new Error(o.j.detail||o.j.error||'could not plan the route');
     const {outline, ctx, jobs} = o.j;
-    stage=`Writing the stories for ${outline.stops.length} places and ${outline.story_topics.length} travel stories (0/${jobs.length})`;
+    step=1; stage=`Writing the stories for ${outline.stops.length} places and ${outline.story_topics.length} travel stories (0/${jobs.length})`;
     const geoP = fn({mode:'create_geocode', items:outline.stops, city:outline.city}, 120000).then(r=>r.ok?r.j.items:[]).catch(()=>[]);
     const texts={}; let done=0; const batches=[]; for(let i=0;i<jobs.length;i+=3) batches.push(jobs.slice(i,i+3));
     let next=0; await Promise.all(Array.from({length:Math.min(5,batches.length)}, async()=>{ while(next<batches.length){ const bt=batches[next++];
       for(let attempt=0; attempt<2; attempt++){ try{ const r=await fn({mode:'create_narrate', ctx, jobs:bt}, 120000); if(r.ok){ Object.assign(texts, r.j.texts||{}); break; } }catch(e){} }
-      done+=bt.length; stage=stage.replace(/\(\d+\/\d+\)/, `(${done}/${jobs.length})`); } }));
-    stage='Placing everything on the map'; const geo=await geoP;
-    stage='Saving the tour';
-    const s2 = await fn({mode:'create_assemble', outline, texts, geo, where, group:form.group}, 60000);
+      done+=bt.length; frac=done/jobs.length; stage=stage.replace(/\(\d+\/\d+\)/, `(${done}/${jobs.length})`); } }));
+    step=2; stage='Placing everything on the map'; show(); const geo=await geoP;
+    step=3; stage='Saving the tour'; show();
+    const s2 = await fn({mode:'create_assemble', outline, texts, geo, where, group:form.group, form}, 60000);
     if(!s2.ok || !s2.j.tour) throw new Error(s2.j.detail||s2.j.error||'could not save');
     const tour=s2.j.tour;
     store.set('rhrn_tourdata_'+tour.id, tour); rememberTour(tour);
+    step=4; $('cBar').style.width='100%'; document.querySelectorAll('#cProg [data-s]').forEach(e=>e.className='done');
     $('cStatus').innerHTML=`<span class="ok">Done: ${esc(tour.title)}, ${tour.stops.length} places and ${(tour.fillers.length+tour.walkStories.length)} stories.</span> Opening…`;
     setTimeout(()=>switchTour(tour.id), 900);
-  }catch(e){ $('cStatus').innerHTML='<span class="bad">Could not create the tour: '+esc(e.name==='AbortError'?'it took too long; try again or pick a shorter tour':e.message).slice(0,200)+'</span>'; }
+  }catch(e){ $('cProg').style.display='none'; $('cStatus').innerHTML='<span class="bad">Could not create the tour: '+esc(e.name==='AbortError'?'it took too long; try again or pick a shorter tour':e.message).slice(0,200)+'</span>'; }
   finally{ clearInterval(tick); $('cGo').disabled=false; }
 };
 

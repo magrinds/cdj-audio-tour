@@ -4,6 +4,7 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 //   mode "ask" (default): answer a question (with web search), or propose a new plan via the update_plan tool
 //   modes "create_outline" / "create_narrate" / "create_geocode" / "create_assemble": build a new tour in steps, save to rhrn_tours
 //   mode "save_plan": store the group's current plan in rhrn_tour_plans
+//   mode "delete_tour": delete a shared tour (owner PIN)
 
 const cors = {
   "Access-Control-Allow-Origin": "*",
@@ -256,10 +257,18 @@ const WORDS: Record<string, string> = { start: "220 to 320", walk: "230 to 350",
 
 // Tour creation runs as several short calls driven by the app, so no single call hits the time limit:
 // outline -> (narrate batches + geocode, in parallel) -> assemble
+function dayName(d: unknown) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(d || ""));
+  if (!m) return "";
+  return " (" + ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"][new Date(Date.UTC(+m[1], +m[2] - 1, +m[3])).getUTCDay()] + ")";
+}
 function briefOf(body: any) {
   return [
     `Where: ${S(body.where, 200)}`,
     body.start ? `Starting point: ${S(body.start, 200)}` : "Starting point: not given, choose one",
+    body.date ? `Tour date: ${S(body.date, 12)}${dayName(body.date)}. Use this day for opening hours.` : "",
+    body.time ? `Leaving the starting point at: ${S(body.time, 8)} local time` : "",
+    body.end ? `Must be done by: ${S(body.end, 8)} local time. Plan the route to finish on time.` : "",
     `Length: ${S(body.length, 30)}`, `Getting around: ${S(body.transport, 30)}`, `Pace: ${S(body.pace, 30)}`,
     `Interests: ${(Array.isArray(body.interests) ? body.interests : []).map((x: unknown) => S(x, 40)).join(", ")}`,
     body.group ? `Group: ${S(body.group, 300)}` : "",
@@ -327,6 +336,16 @@ async function doGeocode(body: any) {
   return json({ items: items.map((x: any) => ({ lat: x.lat, lng: x.lng, approx: !!x.approx })) });
 }
 
+// the answers from the Create form, kept so the tour can be recreated later
+function requestOf(f: any) {
+  if (!f || typeof f !== "object") return null;
+  return {
+    where: S(f.where, 200), start: S(f.start, 200), date: S(f.date, 12), time: S(f.time, 8), end: S(f.end, 8), length: S(f.length, 30), transport: S(f.transport, 30), pace: S(f.pace, 30),
+    interests: (Array.isArray(f.interests) ? f.interests : []).slice(0, 12).map((x: unknown) => S(x, 40)),
+    group: S(f.group, 300), more: S(f.more, 600), createdLocal: S(f.local, 40),
+  };
+}
+
 async function doAssemble(body: any) {
   const t = body.outline || {};
   const texts = body.texts || {};
@@ -355,7 +374,7 @@ async function doAssemble(body: any) {
   const tour = {
     id, title: S(t.title, 80) || where, city: S(t.city, 160) || where, tz: S(t.tz, 60) || undefined, mode,
     blurb: S(t.blurb, 160), trip: S(t.trip, 1500), guestNotes: S(body.group, 300),
-    startId: "s1", stops, quiz,
+    startId: "s1", stops, quiz, request: requestOf(body.form),
     fillers: (mode === "walk" ? [] : stories.filter((x: any) => x.kind !== "walk")).map(strip),
     walkStories: (mode === "walk" ? stories : stories.filter((x: any) => x.kind === "walk")).map(strip),
     createdAt: new Date().toISOString(),
@@ -364,6 +383,19 @@ async function doAssemble(body: any) {
   if (!ins.ok) console.error("save tour failed", ins.status, await ins.text());
   console.log("assembled", id, stops.length, "stops", stories.length, "stories");
   return json({ tour, saved: ins.ok });
+}
+
+// Delete a shared tour for everyone. Needs the owner PIN (same one as the photo album).
+async function doDeleteTour(body: any) {
+  const want = Deno.env.get("ALBUM_ADMIN_PIN");
+  if (!want || typeof body.pin !== "string" || body.pin !== want) return json({ error: "bad_pin" }, 401);
+  const id = S(body.tour_id, 80).trim();
+  if (!id || id === "campos-do-jordao") return json({ error: "tour_id" }, 400);
+  const a = await fetch(`${SB_URL}/rest/v1/rhrn_tours?id=eq.${encodeURIComponent(id)}`, { method: "DELETE", headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` } });
+  await fetch(`${SB_URL}/rest/v1/rhrn_tour_plans?tour_id=eq.${encodeURIComponent(id)}`, { method: "DELETE", headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` } });
+  if (!a.ok) return json({ error: "delete", detail: (await a.text()).slice(0, 200) }, 500);
+  console.log("deleted tour", id);
+  return json({ ok: true });
 }
 
 async function doSavePlan(body: any) {
@@ -384,6 +416,7 @@ Deno.serve(async (req: Request) => {
   try {
     const body = await req.json();
     if (body.mode === "save_plan") return await doSavePlan(body);
+    if (body.mode === "delete_tour") return await doDeleteTour(body);
     const key = (Deno.env.get("ANTHROPIC_API_KEY_RHRN") || "").trim();
     if (!key) return json({ error: "not_configured" }, 503);
     if (body.mode === "create_outline") return await doOutline(key, body);
